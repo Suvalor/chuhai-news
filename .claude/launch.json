@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "chuhai-news", "runtimeExecutable": "bash", "runtimeArgs": ["scripts/dev.sh"], "port": 8090 }
+  ]
+}

@@ -1,0 +1,13 @@
+{% extends "admin/base.html" %}{% block title %}类目{% endblock %}{% block main %}
+<h1>类目</h1>
+{% if error %}<div class="msg">{{ error }}</div>{% endif %}
+<table><thead><tr><th>key</th><th>中文名</th><th>英文名</th><th>中文说明</th><th>英文说明</th><th>排序</th><th>文章</th><th></th></tr></thead><tbody>
+{% for c in cats %}<tr>
+<td class="mono">{{ c.key }}</td><td><input form="f-{{ c.key }}" name="zh" value="{{ c.zh }}" required></td><td><input form="f-{{ c.key }}" name="en" value="{{ c.en }}" required></td>
+<td><input form="f-{{ c.key }}" name="tag_zh" value="{{ c.tag_zh }}"></td><td><input form="f-{{ c.key }}" name="tag_en" value="{{ c.tag_en }}"></td><td><input form="f-{{ c.key }}" name="sort" type="number" value="{{ c.sort }}" style="width:70px"></td><td class="mono">{{ c.n }}</td><td><form id="f-{{ c.key }}" method="post" action="/admin/categories/{{ c.key }}"></form><button form="f-{{ c.key }}" class="sm">保存</button></td></tr>{% endfor %}
+<tr><td><input form="f-new" name="key" value="{{ form.key if form }}" placeholder="新 key，如 design" pattern="[a-z0-9_\-]{1,40}" required></td>
+<td><input form="f-new" name="zh" value="{{ form.zh if form }}" placeholder="中文名" required></td><td><input form="f-new" name="en" value="{{ form.en if form }}" placeholder="英文名" required></td>
+<td colspan="4" class="mute">说明和排序建好后再改</td><td><form id="f-new" method="post" action="/admin/categories"></form><button form="f-new" class="sm">新建</button></td></tr>
+</tbody></table>
+<p class="mute">推送时 category 必须是这里已有的 key，写错会被拒收（422），不会自动建类目。key 建好后不能改。</p>
+{% endblock %}

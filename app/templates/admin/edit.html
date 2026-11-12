@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}{% block title %}{{ a.title if a else '新建文章' }}{% endblock %}{% block main %}
+<h1>{{ '编辑文章' if a and a.id else '新建文章' }}</h1>
+{% if error %}<p class="msg">{{ error }}</p>{% elif request.query_params.get('saved') %}<p class="msg ok">已保存。{% if a.status == 'published' %}<a href="/a/{{ a.slug }}" target="_blank">在前台查看 ↗</a>{% endif %}</p>{% endif %}
+<form method="post" action="/admin/a/save"><input type="hidden" name="id" value="{{ a.id if a and a.id else 0 }}">
+<div class="grid">
+<label class="span2">原文标题<input name="title" value="{{ a.title if a }}" required maxlength="300"></label>
+<label class="span2">译文标题<input name="title_t" value="{{ a.title_t if a }}" maxlength="300"></label>
+<label>slug（网址）<input name="slug" value="{{ a.slug if a }}" placeholder="留空自动生成"></label>
+<label>原文语言<select name="lang">{% for l, n in [('en', '英文'), ('zh', '中文')] %}<option value="{{ l }}" {{ 'selected' if a and a.lang == l }}>{{ n }}</option>{% endfor %}</select></label>
+<label>类目<select name="cat">{% for c in cats %}<option value="{{ c.key }}" {{ 'selected' if a and a.cat == c.key }}>{{ c.zh }} / {{ c.en }}</option>{% endfor %}</select></label>
+<label>状态<select name="status">{% for s in statuses %}<option value="{{ s }}" {{ 'selected' if a and a.status == s }}>{{ {'published': '已发布', 'draft': '草稿', 'archived': '已下架'}[s] }}</option>{% endfor %}</select></label>
+<label>作者 handle<input name="author" value="{{ a.author if a }}" list="authors" required placeholder="maralin"><datalist id="authors">{% for u in authors %}<option value="{{ u.handle }}">{{ u.name }}</option>{% endfor %}</datalist></label>
+<label>新作者显示名（handle 不存在时用）<input name="new_author_name"></label>
+<label>发布时间<input name="published_at" value="{{ (a.published_at or '')[:16] if a }}" placeholder="2026-11-12T08:00"></label>
+<label>原帖链接<input name="source_url" value="{{ a.source_url if a }}" placeholder="https://x.com/…"></label>
+<label class="span4">封面图（分享卡片用，https；留空取正文第一张图）<input name="cover" value="{{ a.cover if a }}" placeholder="https://pbs.twimg.com/media/…"></label>
+<label class="span4">摘要（meta description，留空取首段）<input name="summary" value="{{ a.summary if a }}" maxlength="600"></label>
+</div>
+<p class="mute">正文按空行分段；译文按同样顺序分段，第 N 段对应原文第 N 段。小标题写 <code>## 标题</code>，配图写 <code>![图注](https://图片地址)</code>，译文栏同一位置照写。</p>
+<div class="cols"><label>原文<textarea name="orig" required>{{ orig }}</textarea></label><label>译文<textarea name="trans">{{ trans }}</textarea></label></div>
+<div class="bar" style="margin-top:16px"><button>保存</button><a class="btn ghost" href="/admin">返回列表</a></div>
+</form>
+{% if a and a.id %}<form method="post" action="/admin/a/{{ a.id }}/delete" onsubmit="return confirm('永久删除这篇文章？此操作不能撤销。只想隐藏请把状态改成「已下架」。')"><button class="danger">永久删除</button></form>{% endif %}
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block body %}
+<header class="hd rd-hd"><div class="wrap hd-in">
+<a href="/" class="back" data-back>← <span class="desk-only">{{ t.back }}</span></a>
+<div class="crumb mono xs up desk-only" data-meta><a href="/c/{{ a.cat }}">{{ a.cat_name }}</a><span>/</span><a href="/u/{{ a.author }}" class="nocase">{{ a.author_name }}</a></div>
+<div class="sp"></div>
+<div class="pills ctx" role="group" aria-label="{{ t.cont }}">
+<button type="button" class="on" data-ctx="author">{{ t.sameAuthor }}</button><button type="button" data-ctx="cat">{{ t.sameCat }}</button>
+</div>
+<div class="sp"></div>
+{% if a.has_trans %}<button type="button" class="trans-btn" data-trans aria-pressed="false"><span>{{ t.transShort }}</span><span class="track"><span class="knob"></span></span></button>{% endif %}
+</div>
+<div class="progress" aria-hidden="true"><i data-progress></i></div>
+</header>
+
+<div class="wrap rd-grid">
+<aside class="rail wide-only" aria-label="{{ t.cont }}">
+<span class="mono xs up mute">{{ t.cont }} · <span data-ctx-name>{{ a.author_name }}</span></span>
+<nav class="rail-list" data-rail>{{ m.rail(a, rails.author, t) }}</nav>
+<span class="mono xxs mute2 keys">{{ t.keys }}</span>
+</aside>
+
+<main id="main" class="stream" data-stream>
+{% set divider = None %}{% include "_article.html" %}
+</main>
+
+<aside class="side wide-only" data-side>{{ m.side(a, bio, nxt, t) }}</aside>
+</div>
+<div class="flow-foot" data-flow data-more="{{ t.flowMore }}" data-end="{{ t.flowEnd }}">{{ t.flowMore }}</div>
+
+<div class="rbar compact-only">
+<button type="button" class="pill-btn" data-sheet-open>{{ t.toc }}</button>
+<span class="sp"></span>
+<button type="button" class="ico" data-like="{{ a.slug }}" aria-pressed="false" aria-label="{{ t.like }}"><i class="glyph" data-on="♥" data-off="♡">♡</i><span data-n>{{ a.likes_f }}</span></button>
+<button type="button" class="ico" data-save="{{ a.slug }}" aria-pressed="false" aria-label="{{ t.save }}"><i class="glyph" data-on="◆" data-off="◇">◇</i><span data-n>{{ a.saves_f }}</span></button>
+<button type="button" class="btn-ink sm" data-go-next>{{ t.next }} →</button>
+</div>
+
+<div class="sheet-wrap" data-sheet hidden>
+<div class="sheet-bg" data-sheet-close></div>
+<div class="sheet" role="dialog" aria-modal="true" aria-label="{{ t.toc }}">
+<div class="sheet-hd"><span class="mono xs up mute">{{ t.cont }}</span><button type="button" class="linkish" data-sheet-close>{{ t.close }}</button></div>
+<div class="pills ctx full"><button type="button" class="on" data-ctx="author">{{ t.sameAuthor }} · <span data-ctx-n="author">{{ rails.author | length }}</span></button><button type="button" data-ctx="cat">{{ t.sameCat }} · <span data-ctx-n="cat">{{ rails.cat | length }}</span></button></div>
+<nav class="rail-list" data-rail>{{ m.rail(a, rails.author, t) }}</nav>
+</div>
+</div>
+{% endblock %}

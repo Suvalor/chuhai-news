@@ -1,0 +1,19 @@
+{% extends "admin/base.html" %}{% block title %}文章{% endblock %}{% block main %}
+<h1>文章</h1>
+<form class="bar" method="get"><input name="q" value="{{ q }}" placeholder="搜标题、正文、作者">
+<select name="status" style="width:auto"><option value="">全部状态</option>{% for s, n in counts.items() %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ {'published': '已发布', 'draft': '草稿', 'archived': '已下架'}[s] }} ({{ n }})</option>{% endfor %}</select>
+<select name="cat" style="width:auto"><option value="">全部类目</option>{% for k, zh in cats.items() %}<option value="{{ k }}" {{ 'selected' if cat == k }}>{{ zh }}</option>{% endfor %}</select>
+<select name="author" style="width:auto"><option value="">全部作者</option>{% for u in authors %}<option value="{{ u.handle }}" {{ 'selected' if author == u.handle }}>{{ u.name }} @{{ u.handle }}</option>{% endfor %}</select>
+<button class="ghost">筛选</button>{% if q or status or cat or author %}<a href="/admin">清除</a>{% endif %}<span class="sp"></span><a class="btn" href="/admin/a/new">＋ 新建文章</a></form>
+<table><thead><tr><th>标题</th><th>作者</th><th>类目</th><th>发布</th><th>阅读 / 赞 / 收藏</th><th>状态</th><th></th></tr></thead><tbody>
+{% for a in rows %}<tr>
+<td><a href="/admin/a/{{ a.id }}"><b>{{ a.title }}</b></a>{% if a.title_t %}<div class="mute">{{ a.title_t }}</div>{% endif %}<div class="mono mute">/a/{{ a.slug }}</div></td>
+<td>{{ a.author_name }}<div class="mono mute">@{{ a.author }}</div></td><td class="nw">{{ cats.get(a.cat, a.cat) }}</td>
+<td class="mono nw">{{ a.published_at[:16].replace('T', ' ') }}</td><td class="mono nw">{{ a.views }} / {{ a.likes }} / {{ a.saves }}</td>
+<td class="nw"><span class="badge {{ a.status }}">{{ {'published': '已发布', 'draft': '草稿', 'archived': '已下架'}[a.status] }}</span></td>
+<td style="white-space:nowrap">{% if a.status == 'published' %}<a href="/a/{{ a.slug }}" target="_blank">看 ↗</a>{% endif %}
+<form class="inline" method="post" action="/admin/a/{{ a.id }}/status"><input type="hidden" name="status" value="{{ 'archived' if a.status == 'published' else 'published' }}"><button class="ghost sm">{{ '下架' if a.status == 'published' else '发布' }}</button></form></td>
+</tr>{% else %}<tr><td colspan="7" class="mute">没有文章。通过 WebHook 推送或点「新建文章」。</td></tr>{% endfor %}
+</tbody></table>
+<div class="bar" style="margin-top:16px">{% if page_no > 1 %}<a href="?q={{ q|urlencode }}&status={{ status }}&cat={{ cat|urlencode }}&author={{ author|urlencode }}&page_no={{ page_no - 1 }}">← 上一页</a>{% endif %}<span class="sp"></span>{% if has_more %}<a href="?q={{ q|urlencode }}&status={{ status }}&cat={{ cat|urlencode }}&author={{ author|urlencode }}&page_no={{ page_no + 1 }}">下一页 →</a>{% endif %}</div>
+{% endblock %}

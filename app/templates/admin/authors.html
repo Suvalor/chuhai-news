@@ -1,0 +1,8 @@
+{% extends "admin/base.html" %}{% block title %}作者{% endblock %}{% block main %}
+<h1>作者</h1>
+<table><thead><tr><th>handle</th><th>显示名</th><th>中文简介</th><th>英文简介</th><th>文章</th><th></th></tr></thead><tbody>
+{% for u in authors %}<tr>
+<td class="mono"><a href="/u/{{ u.handle }}" target="_blank">@{{ u.handle }}</a></td><td><input form="f-{{ u.handle }}" name="name" value="{{ u.name }}" required></td>
+<td><input form="f-{{ u.handle }}" name="bio_zh" value="{{ u.bio_zh }}"></td><td><input form="f-{{ u.handle }}" name="bio_en" value="{{ u.bio_en }}"></td><td class="mono">{{ u.n }}</td><td><form id="f-{{ u.handle }}" method="post" action="/admin/authors/{{ u.handle }}"></form><button form="f-{{ u.handle }}" class="sm">保存</button></td></tr>
+{% else %}<tr><td colspan="6" class="mute">还没有作者。作者会随 WebHook 推送自动创建。</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

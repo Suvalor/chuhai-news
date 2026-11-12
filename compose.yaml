@@ -1,0 +1,13 @@
+services:
+  web:
+    build: .
+    image: chuhainews:latest
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8090:8090"   # 只给本机反代（Caddy/Nginx）用，不直接暴露公网
+    volumes:
+      - chuhai-data:/app/data   # SQLite 库在这里，重建镜像不丢数据
+
+volumes:
+  chuhai-data:

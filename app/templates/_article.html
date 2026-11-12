@@ -1,0 +1,29 @@
+{% import "_macros.html" as m with context %}
+<article class="art" data-art="{{ a.slug }}" data-title="{{ a.title }} — {{ a.author_name }} · chuhainews">
+{% if divider %}<div class="divider mono xs up red">{{ divider }}</div>{% endif %}
+<header class="art-hd">
+<span class="mono xs up mute"><a href="/c/{{ a.cat }}" class="plain">{{ a.cat_name }}</a> — {{ a.mins }} {{ t.min }} — {{ a.lang_label }} — <time datetime="{{ a.published_at }}">{{ a.date_label }}</time></span>
+<h1 class="art-h f-{{ a.f }}{{ ' has-t' if a.has_trans }}">{{ m.title_pair(a) }}</h1>
+{% if a.title_t %}<div class="deck{{ ' has-t' if a.has_trans }}"><span class="o">{{ a.title_t }}</span><span class="tr">{{ a.title }}</span></div>{% endif %}
+{% if a.has_trans %}<div class="banner mono xs tr-only"><i class="reddot"></i><span>{{ t.transTo }}{{ t.langEn if a.lang == 'en' else t.langZh }}</span><button type="button" class="linkish" data-trans>{{ t.viewOrig }}</button></div>{% endif %}
+<div class="au-bar compact-only">
+<a href="/u/{{ a.author }}" class="avatar" aria-hidden="true" tabindex="-1">{{ a.author_name[:1] | upper }}</a>
+<a href="/u/{{ a.author }}" class="au-bar-n"><b>{{ a.author_name }}</b><span class="mono xs mute">@{{ a.author }}</span></a>
+{% if a.source_url %}<a href="{{ a.source_url }}" target="_blank" rel="noopener nofollow" class="btn-ink sm">{{ t.onX }} ↗</a>{% endif %}
+</div>
+</header>
+<div class="art-body" data-body>
+{% set tl = 'zh' if a.lang == 'en' else 'en' %}
+{% for p in a.paras %}{% set kind = p[2] if p | length > 2 else 'p' %}
+{% if kind == 'h2' %}<h2 class="sub{{ ' has-t' if p[1] }}"><span class="o" lang="{{ a.lang }}">{{ p[0] }}</span>{% if p[1] %}<span class="tr" lang="{{ tl }}">{{ p[1] }}</span>{% endif %}</h2>
+{% elif kind == 'img' %}<figure class="fig"><img src="{{ p[3] }}" alt="{{ p[1] if a.lang == 'en' and p[1] else p[0] }}" loading="lazy" decoding="async" referrerpolicy="no-referrer">{% if p[0] %}<figcaption class="mono xs mute{{ ' has-t' if p[1] }}"><span class="o" lang="{{ a.lang }}">{{ p[0] }}</span>{% if p[1] %}<span class="tr" lang="{{ tl }}">{{ p[1] }}</span>{% endif %}</figcaption>{% endif %}</figure>
+{% else %}<p class="{{ 'lead' if loop.first }}{{ ' has-t' if p[1] }}"><span class="o" lang="{{ a.lang }}">{{ p[0] }}</span>{% if p[1] %}<span class="tr" lang="{{ tl }}">{{ p[1] }}</span>{% endif %}</p>
+{% endif %}{% endfor %}
+</div>
+<div class="credit mono xs mute"><span class="red">■</span><span>{{ t.copyright }} @{{ a.author }}</span>{% if a.source_url %}<a href="{{ a.source_url }}" target="_blank" rel="noopener nofollow">{{ t.readSource }} ↗</a>{% endif %}</div>
+<template data-tpl-side>{{ m.side(a, bio, nxt, t) }}</template>
+<template data-tpl-rail-author>{{ m.rail(a, rails.author, t) }}</template>
+<template data-tpl-rail-cat>{{ m.rail(a, rails.cat, t) }}</template>
+<template data-tpl-meta><a href="/c/{{ a.cat }}">{{ a.cat_name }}</a><span>/</span><a href="/u/{{ a.author }}" class="nocase">{{ a.author_name }}</a></template>
+<template data-tpl-ctx>{{ a.author_name }}|{{ a.cat_name }}|{{ rails.author | length }}|{{ rails.cat | length }}</template>
+</article>

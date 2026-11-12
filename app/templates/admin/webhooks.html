@@ -1,0 +1,15 @@
+{% extends "admin/base.html" %}{% block title %}WebHook{% endblock %}{% block main %}
+<h1>WebHook</h1>
+{% if not configured %}<p class="msg">未设置 <code>WEBHOOK_SECRET</code>，所有推送都会被拒收（503）。</p>{% endif %}
+<p>推送地址：<code>POST {{ base }}/api/webhook</code>　认证：<code>X-Chuhai-Signature: sha256=HMAC(secret, body)</code> 或 <code>Authorization: Bearer &lt;secret&gt;</code>。协议见项目 README。</p>
+<pre>curl -X POST {{ base }}/api/webhook \
+  -H "Authorization: Bearer $WEBHOOK_SECRET" -H "Content-Type: application/json" \
+  -d '{"external_id":"x:123","source_url":"https://x.com/maralin/status/123","lang":"en","category":"cog",
+       "title":"Notes on Taste","title_translated":"关于品味的几条笔记",
+       "author":{"handle":"maralin","name":"Mara Lin"},
+       "paragraphs":[{"text":"Taste is not a gift.","translation":"品味不是天赋。"}]}'</pre>
+<h1 style="margin-top:32px">最近投递</h1>
+<table><thead><tr><th>时间</th><th>结果</th><th>说明</th><th>external_id</th></tr></thead><tbody>
+{% for l in logs %}<tr><td class="mono">{{ l.ts[:19].replace('T', ' ') }}</td><td><span class="badge {{ 'published' if l.ok else 'err' }}">{{ l.status }}</span></td><td>{{ l.message }}</td><td class="mono mute">{{ l.external_ids }}</td></tr>
+{% else %}<tr><td colspan="4" class="mute">还没有投递记录。</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

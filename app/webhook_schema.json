@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "chuhainews WebHook 推送文章 / Push articles",
+  "description": "POST /api/webhook，Content-Type: application/json。认证二选一：请求头 `Authorization: Bearer <WEBHOOK_SECRET>`（LLM / 自动化平台用这个），或签名：`X-Chuhai-Timestamp: <当前 Unix 秒>` 加 `X-Chuhai-Signature: sha256=<hex(HMAC_SHA256(WEBHOOK_SECRET, 时间戳 + \".\" + 原始请求体))>`，时间戳偏差超过 5 分钟拒收，同一签名重放返回 409。同一 IP 认证失败过多会暂时 429。请求体可以是一篇文章、文章数组，或 {\"articles\": [...]}；每批 1–100 篇、≤5MB。整批先校验再入库：任何一篇不合法则整批拒收，返回 422 {error, index}，按 error 改第 index 篇后重推。同一 external_id 再推 = 更新；views/likes/saves 只替换来源部分，本站读者产生的增量保留。成功返回 200 {ok, results:[{external_id, slug, created, url}]}。本站不做翻译，译文需在推送前写好。也可用 MCP 工具 publish_articles 推送（同样的字段与认证）。",
+  "oneOf": [
+    {"$ref": "#/$defs/article"},
+    {"type": "array", "items": {"$ref": "#/$defs/article"}, "minItems": 1, "maxItems": 100},
+    {"type": "object", "properties": {"articles": {"type": "array", "items": {"$ref": "#/$defs/article"}, "minItems": 1, "maxItems": 100}}, "required": ["articles"]}
+  ],
+  "$defs": {
+    "article": {
+      "type": "object",
+      "description": "external_id 与 source_url 至少给一个；正文 paragraphs 与 body 二选一。",
+      "properties": {
+        "external_id": {"type": "string", "maxLength": 300, "description": "来源里的唯一 ID，用于去重和更新，如 x:2118355780474937831。缺省时用 source_url。"},
+        "source_url": {"type": "string", "maxLength": 2000, "pattern": "^https?://", "description": "原帖链接。"},
+        "lang": {"enum": ["en", "zh"], "default": "en", "description": "原文语言；译文语言取另一种。"},
+        "category": {"type": "string", "pattern": "^[a-z0-9_-]{1,40}$", "description": "类目 key：cog 认知 / money 商业 / ai / tool 工具 / global 出海 / create 创作。必须是已有类目，写错会 422 并列出可用 key；新类目需先在后台创建。"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 300, "description": "原文标题。"},
+        "title_translated": {"type": "string", "maxLength": 300, "description": "译文标题。无译文时前台不显示翻译开关。英文译名也用来生成网址。"},
+        "author": {
+          "type": "object",
+          "properties": {
+            "handle": {"type": "string", "pattern": "^@?[A-Za-z0-9_]{1,60}$", "description": "X 用户名，可带 @。"},
+            "name": {"type": "string", "maxLength": 120, "description": "显示名。缺省时：新作者用 handle，已有作者保持原名。bio 同理，空值不覆盖。"},
+            "bio_zh": {"type": "string", "maxLength": 500},
+            "bio_en": {"type": "string", "maxLength": 500}
+          },
+          "required": ["handle"]
+        },
+        "paragraphs": {
+          "type": "array", "maxItems": 400, "minItems": 1,
+          "description": "按顺序的段落。纯字符串 = 无译文正文段。",
+          "items": {"oneOf": [
+            {"type": "string", "minLength": 1, "maxLength": 20000},
+            {"type": "object", "properties": {
+              "type": {"enum": ["paragraph", "heading", "image"], "default": "paragraph", "description": "heading = 小标题；image = 配图。"},
+              "text": {"type": "string", "maxLength": 20000, "description": "原文；image 时为图注，可省略。paragraph/heading 必填。"},
+              "translation": {"type": "string", "maxLength": 20000, "description": "译文；image 时为图注译文。"},
+              "src": {"type": "string", "maxLength": 2000, "pattern": "^https://\\S+$", "description": "图片地址，仅 type=image 时用且必填，只收 https。"}
+            }}
+          ]}
+        },
+        "body": {"type": "string", "maxLength": 200000, "description": "paragraphs 的替代写法：按空行分段的纯文本；`## 标题` 为小标题，`![图注](https://图片)` 为配图。"},
+        "body_translated": {"type": "string", "maxLength": 200000, "description": "与 body 同样分段的译文，第 N 段对应第 N 段。"},
+        "published_at": {"type": "string", "maxLength": 40, "description": "ISO 8601 时间，如 2026-11-05T14:52:29Z；缺省为入库时间。"},
+        "status": {"enum": ["published", "draft"], "default": "published", "description": "draft 只进后台，不对外。"},
+        "summary": {"type": "string", "maxLength": 600, "description": "摘要，作 SEO 描述；缺省取开头正文。"},
+        "cover": {"type": "string", "maxLength": 2000, "pattern": "^https://\\S+$", "description": "封面图（https），用作分享卡片 og:image / twitter:image 和结构化数据 image。缺省时取正文第一张图。"},
+        "slug": {"type": "string", "maxLength": 80, "description": "自定义网址；缺省由英文标题生成。"},
+        "mins": {"type": "integer", "minimum": 1, "maximum": 599, "description": "阅读分钟数；缺省自动估算。"},
+        "views": {"type": "integer", "minimum": 0, "description": "来源平台（如 X）的浏览数。前台显示 = 此数 + 本站阅读。缺省不改。"},
+        "likes": {"type": "integer", "minimum": 0, "description": "来源平台的点赞数。前台显示 = 此数 + 本站点赞。缺省不改。"},
+        "saves": {"type": "integer", "minimum": 0, "description": "来源平台的收藏（X 书签）数。前台显示 = 此数 + 本站收藏。缺省不改。"}
+      },
+      "required": ["category", "title", "author"],
+      "anyOf": [{"required": ["external_id"]}, {"required": ["source_url"]}]
+    }
+  },
+  "examples": [{
+    "external_id": "x:2120385360677204173",
+    "source_url": "https://x.com/jinchenma_ai/status/2120385360677204173",
+    "lang": "zh",
+    "category": "tool",
+    "title": "最值钱的数据都在口头沟通里",
+    "title_translated": "Your most valuable data lives in conversations",
+    "author": {"handle": "jinchenma_ai", "name": "金尘马"},
+    "published_at": "2026-11-11T05:17:19Z",
+    "views": 18400, "likes": 312, "saves": 905,
+    "cover": "https://pbs.twimg.com/media/HW0eI5laQAAy7DB?format=jpg&name=large",
+    "paragraphs": [
+      {"text": "现在 AI 的能力已经足够强，能不能用好它，关键在自己的数据。", "translation": "AI is capable enough now. Using it well comes down to your own data."},
+      {"type": "heading", "text": "第一步：采集", "translation": "Step 1: Capture"},
+      {"type": "image", "src": "https://pbs.twimg.com/media/HW0eI5laQAAy7DB?format=jpg&name=large"}
+    ]
+  }]
+}

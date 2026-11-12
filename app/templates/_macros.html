@@ -1,0 +1,46 @@
+{% macro navlinks(view, t, cls) -%}
+{% for k, label, href in [('home', t.discover, '/'), ('search', t.search, '/search'), ('saved', t.saved, '/saved')] %}
+{% set on = view == k or (k == 'home' and view in ('cat', 'author')) %}
+<a href="{{ href }}" class="{{ cls }}{{ ' on' if on }}"{% if on %} aria-current="page"{% endif %}><i class="dot" aria-hidden="true"></i>{{ label }}{% if k == 'search' %}<span class="desk-only"> /</span>{% endif %}{% if k == 'saved' %}<span class="saved-n" data-saved-count></span>{% endif %}</a>
+{% endfor %}
+{%- endmacro %}
+
+{% macro uipills(ui, path) -%}
+<div class="pills" role="group" aria-label="Language">
+<a href="/ui/zh?next={{ path | urlencode }}" class="{{ 'on' if ui == 'zh' }}" hreflang="zh" rel="nofollow">中</a><a href="/ui/en?next={{ path | urlencode }}" class="{{ 'on' if ui == 'en' }}" hreflang="en" rel="nofollow">EN</a>
+</div>
+{%- endmacro %}
+
+{% macro title_pair(a, tag='span') -%}
+<span class="o" lang="{{ a.lang }}">{{ a.title }}</span>{% if a.has_trans %}<span class="tr f-{{ a.ft }}" lang="{{ 'zh' if a.lang == 'en' else 'en' }}">{{ a.title_t }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro rail(a, list, t) -%}
+{% for x in list %}
+<a href="/a/{{ x.slug }}" class="rail-i{{ ' on' if x.slug == a.slug }}" data-slug="{{ x.slug }}">
+<span class="rail-no">{{ '%02d' % loop.index }}</span>
+<span class="rail-t f-{{ x.f }}{{ ' has-t' if x.title_t }}"><span class="o">{{ x.title }}</span>{% if x.title_t %}<span class="tr f-{{ x.ft }}">{{ x.title_t }}</span>{% endif %}</span>
+</a>
+{% endfor %}
+{%- endmacro %}
+
+{% macro side(a, bio, nxt, t) -%}
+<a href="/u/{{ a.author }}" class="side-au">
+<span class="avatar lg" aria-hidden="true">{{ a.author_name[:1] | upper }}</span>
+<span class="side-name f-{{ font(a.author_name) }}">{{ a.author_name }}</span>
+<span class="mono sm mute">@{{ a.author }}</span>
+{% if bio %}<span class="side-bio">{{ bio }}</span>{% endif %}
+</a>
+{% if a.source_url %}<a href="{{ a.source_url }}" target="_blank" rel="noopener nofollow" class="btn-ink wide">{{ t.onX }}<span>↗</span></a>{% endif %}
+<div class="side-acts">
+<button type="button" class="act" data-like="{{ a.slug }}" aria-pressed="false"><span><i class="glyph" data-on="♥" data-off="♡">♡</i>{{ t.like }}</span><span class="mono" data-n>{{ a.likes_f }}</span></button>
+<button type="button" class="act" data-save="{{ a.slug }}" aria-pressed="false"><span><i class="glyph" data-on="◆" data-off="◇">◇</i>{{ t.save }}</span><span class="mono" data-n>{{ a.saves_f }}</span></button>
+<div class="act static"><span>{{ t.read }}</span><span class="mono">{{ a.views_f }}</span></div>
+</div>
+{% for c in ('author', 'cat') %}{% set n, how = nxt[c] %}{% if n %}
+<a href="/a/{{ n.slug }}" class="side-next ctx-{{ c }}" data-next>
+<span class="mono xs up mute">{{ t.next }} → · {{ t.sameAuthor if how == 'author' else t.sameCat }}</span>
+<span class="side-next-t f-{{ n.f }}{{ ' has-t' if n.title_t }}"><span class="o">{{ n.title }}</span>{% if n.title_t %}<span class="tr">{{ n.title_t }}</span>{% endif %}</span>
+</a>
+{% endif %}{% endfor %}
+{%- endmacro %}
