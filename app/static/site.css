@@ -188,13 +188,23 @@ h1, h2, h3, p { margin: 0; }
 .pager { display: flex; padding-top: 28px; }
 
 /* 页脚 */
-.ft { background: var(--ink); color: var(--paper); padding: 64px 0 40px; overflow: hidden; }
-.ft .wrap { display: flex; flex-direction: column; gap: 28px; }
-.ft-row { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; opacity: .7; }
-.ft-links { display: flex; gap: 20px; }
-.ft a { color: var(--paper); opacity: .7; } .ft a:hover { opacity: 1; color: var(--paper); }
-.ft-word { font-family: var(--serif-en); font-style: italic; font-size: min(18vw, 260px); line-height: .8; letter-spacing: -.04em; white-space: nowrap; }
-@media (max-width: 759px) { .ft { padding: 40px 0 100px; } }
+.ft { background: var(--ink); color: var(--paper); padding: 48px 0 24px; }
+.ft-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .85fr); gap: 32px; }
+.ft-brand p { margin-top: 10px; color: var(--track); font-size: 14px; line-height: 1.6; }
+.ft a { color: var(--paper); }
+.ft a:hover, .ft a:focus-visible { text-decoration: underline; text-underline-offset: .25em; }
+.ft a:focus-visible { outline-color: var(--paper); }
+.ft-word { display: inline-block; font-family: var(--serif-en); font-style: italic; font-size: clamp(42px, 5.4vw, 76px); line-height: .95; letter-spacing: -.035em; }
+.ft-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.ft-nav h2 { color: var(--track); font: 500 12px/1.5 var(--mono); letter-spacing: .05em; }
+.ft-nav ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.ft-nav a { display: inline-block; padding: 5px 0; font-size: 14px; line-height: 1.4; }
+.ft-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--mute); color: var(--track); font-size: 12px; line-height: 1.5; }
+@media (max-width: 759px) {
+  .ft { padding: 36px 0 calc(90px + env(safe-area-inset-bottom)); }
+  .ft-main { grid-template-columns: 1fr; gap: 24px; }
+  .ft-meta { margin-top: 24px; }
+}
 
 /* 手机底部导航 */
 .mnav { position: fixed; left: 0; right: 0; bottom: 0; height: 62px; background: rgba(245, 242, 236, .96); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--ink); z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
