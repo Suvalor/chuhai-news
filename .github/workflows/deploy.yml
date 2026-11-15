@@ -1,0 +1,92 @@
+name: CI and deploy
+
+'on':
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Run tests with locked dependencies
+        run: pipx run --spec uv==0.11.6 uv run --locked --python 3.13 python -m pytest -q
+      - name: Build the production image
+        run: docker build .
+
+  deploy:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true'))
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions: {}
+    environment: production
+    concurrency:
+      group: chuhai-news-production
+      cancel-in-progress: false
+    steps:
+      - name: Update the server and check the site
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_HOST:?Set DEPLOY_HOST in production variables}"
+          : "${DEPLOY_USER:?Set DEPLOY_USER in production variables}"
+          : "${DEPLOY_PATH:?Set DEPLOY_PATH in production variables}"
+          : "${DEPLOY_SSH_KEY:?Set DEPLOY_SSH_KEY in production secrets}"
+          : "${DEPLOY_KNOWN_HOSTS:?Set DEPLOY_KNOWN_HOSTS in production secrets}"
+          [[ "$DEPLOY_PATH" == /* && "$DEPLOY_PATH" != *$'\n'* ]]
+          umask 077
+          ssh_dir=$(mktemp -d)
+          trap 'rm -f "$ssh_dir/key" "$ssh_dir/known_hosts"; rmdir "$ssh_dir"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > "$ssh_dir/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          unset DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS
+          printf -v command 'bash -se -- %q %q' "$DEPLOY_PATH" "$GITHUB_SHA"
+
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            -i "$ssh_dir/key" -p "$DEPLOY_PORT" -l "$DEPLOY_USER" -- "$DEPLOY_HOST" "$command" <<'REMOTE'
+          set -euo pipefail
+          cd -- "$1"
+          revision=$2
+          [[ "$(git rev-parse --show-toplevel)" == "$PWD" &&
+             "$(git branch --show-current)" == main ]] || {
+            echo 'DEPLOY_PATH must be the root of a checkout on main.' >&2
+            exit 1
+          }
+          [[ -s .env ]] || { echo 'Set up the server .env first.' >&2; exit 1; }
+          [[ -z "$(git status --porcelain --untracked-files=no)" ]] || {
+            echo 'Tracked files on the server have local changes.' >&2
+            exit 1
+          }
+          git fetch --no-tags https://github.com/Suvalor/chuhai-news.git refs/heads/main
+          [[ "$(git rev-parse FETCH_HEAD)" == "$revision" ]] || {
+            echo 'This run is stale. Run the workflow for the latest main commit.' >&2
+            exit 1
+          }
+          git merge --ff-only "$revision"
+          [[ "$(git rev-parse HEAD)" == "$revision" ]]
+          docker compose up -d --build --wait --wait-timeout 180 web
+          curl --fail --silent --show-error --max-time 15 http://127.0.0.1:8090/ -o /dev/null
+          echo "Deployed $revision"
+          REMOTE
