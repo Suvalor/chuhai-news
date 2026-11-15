@@ -319,3 +319,129 @@ def test_mcp_write_token_overrides_webhook_secret(c, monkeypatch):
     assert not mcp_call(c, "publish_articles", {"articles": [art]}, token="mcp-only").get("isError")
     from app import limits
     limits._fails.clear()
+
+
+def test_json_articles_api(c):
+    art = {**ART, "external_id": "x:json", "source_url": "https://x.com/maralin/status/99", "title": "Feeds For Agents",
+           "title_translated": "给代理读的信源", "category": "money", "views": 7}
+    assert signed(c, art).status_code == 200
+    arts = c.get("/api/articles", params={"limit": 500}).json()["articles"]
+    a = next(x for x in arts if x["slug"] == "feeds-for-agents")
+    assert a["url"] == "https://chuhai.test/a/feeds-for-agents" and a["title_translated"] == "给代理读的信源"
+    assert a["source_url"] == "https://x.com/maralin/status/99" and a["author"]["handle"] == "maralin" and a["summary"] and a["views"] == 7
+    money = c.get("/api/articles", params={"category": "money"}).json()["articles"]
+    assert money and {x["category"] for x in money} == {"money"}
+    full = c.get("/api/articles/feeds-for-agents").json()
+    assert full["paragraphs"][0] == {"type": "paragraph", "text": "Taste is not a gift.", "translation": "品味不是天赋。"}
+    assert c.get("/api/articles/nope").status_code == 404
+
+
+def test_editorial_intro_shown_in_page_md_and_llms(c):
+    intro = "作者把定价当成定位来讲。对出海小团队，先定价再写落地页更省事。"
+    assert signed(c, {**ART, "external_id": "x:intro", "title": "Intro Probe", "summary": intro}).status_code == 200
+    page = c.get("/a/intro-probe").text
+    assert '<aside class="intro"' in page and intro in page and f'<meta name="description" content="{intro}">' in page
+    md = c.get("/a/intro-probe.md").text
+    assert md.index("## 编者导读") < md.index(intro) < md.index("## 原文")
+    assert "https://chuhai.test/a/intro-probe.md): Mara Lin — 作者把定价当成定位来讲。\n" in c.get("/llms.txt").text
+    assert signed(c, {**ART, "external_id": "x:nointro", "title": "No Intro Probe"}).status_code == 200
+    assert 'class="intro"' not in c.get("/a/no-intro-probe").text and "编者导读" not in c.get("/a/no-intro-probe.md").text
+    assert "No Intro Probe](https://chuhai.test/a/no-intro-probe.md): Mara Lin — 关于品味的几条笔记" in c.get("/llms.txt").text
+    assert signed(c, {**ART, "external_id": "x:xss", "title": "Xss Probe", "summary": "<script>alert(1)</script>"}).status_code == 200
+    assert "<script>alert(1)" not in c.get("/a/xss-probe").text and "&lt;script&gt;alert(1)" in c.get("/a/xss-probe").text
+
+
+def test_about_page(c, monkeypatch):
+    page = c.get("/about")
+    assert page.status_code == 200 and '"@type": "AboutPage"' in page.text and "没有逐篇人工校对" in page.text
+    assert "mailto:" not in page.text  # 没配邮箱就不显示联系方式
+    monkeypatch.setenv("CONTACT_EMAIL", "editor@chuhai.test")
+    page = c.get("/about").text
+    assert 'href="mailto:editor@chuhai.test"' in page and '"email": "editor@chuhai.test"' in page
+    assert 'href="/about"' in c.get("/").text and "https://chuhai.test/about" in c.get("/llms.txt").text
+    locs = [e.text for e in ET.fromstring(c.get("/sitemap.xml").content).iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")]
+    assert "https://chuhai.test/about" in locs
+
+
+def admin_id(c, title):
+    return re.search(rf'href="/admin/a/(\d+)"><b>{re.escape(title)}</b>', c.get("/admin", params={"q": title}).text).group(1)
+
+
+def test_topics_admin_and_public(c):
+    assert c.get("/admin/topics", follow_redirects=False).status_code == 303
+    c.post("/admin/login", data={"password": "pw-test"})
+    assert c.post("/admin/topics", data={"key": "Bad Key", "title": "x"}).status_code == 400
+    assert c.post("/admin/topics", data={"key": "pricing-101", "title": "定价入门"}, follow_redirects=False).status_code == 303
+    assert c.post("/admin/topics", data={"key": "pricing-101", "title": "again"}).status_code == 400
+    assert c.get("/t/pricing-101").status_code == 404  # 新建是草稿
+    r = c.post("/admin/topics/pricing-101", data={"title": "定价入门", "items": "no-such-slug | x", "status": "published"})
+    assert r.status_code == 400 and "找不到文章「no-such-slug」" in r.text
+    items = "https://chuhai.test/a/pricing-is-positioning | 先读这篇：定价就是定位\nnotes-on-taste\nnotes-on-taste | 重复的行只算一次"
+    c.post("/admin/topics/pricing-101", data={"title": "定价入门", "intro": "给第一次定价的人。按顺序读。", "items": items,
+                                              "status": "published", "sort": "0"})
+    page = c.get("/t/pricing-101").text
+    assert page.index("Pricing Is Positioning") < page.index("Notes on Taste") and "先读这篇：定价就是定位" in page
+    assert page.count('class="row"') == 2 and '"@type": "CollectionPage"' in page and 'class="sorts"' not in page
+    assert 'href="/t/pricing-101"' in c.get("/").text and "05 — " in c.get("/").text
+    assert "[定价入门](https://chuhai.test/t/pricing-101): 2 篇 — 给第一次定价的人。" in c.get("/llms.txt").text
+    locs = [e.text for e in ET.fromstring(c.get("/sitemap.xml").content).iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")]
+    assert "https://chuhai.test/t/pricing-101" in locs
+    tps = mcp_call(c, "list_topics", {})["structuredContent"]["result"]
+    tp = next(t for t in tps if t["key"] == "pricing-101")
+    assert [a["slug"] for a in tp["articles"]] == ["pricing-is-positioning", "notes-on-taste"]
+    assert tp["articles"][0]["note"] == "先读这篇：定价就是定位"
+    # 下架文章后专题里不再出现；专题里一篇都不剩时首页不展示
+    aid = admin_id(c, "Pricing Is Positioning")
+    c.post(f"/admin/a/{aid}/status", data={"status": "archived"})
+    assert "Pricing Is Positioning" not in c.get("/t/pricing-101").text
+    c.post("/admin/topics/pricing-101", data={"title": "<b>t</b>", "intro": "", "items": "notes-on-taste | <i>n</i>",
+                                              "status": "published", "sort": "0"})
+    assert "&lt;i&gt;n&lt;/i&gt;" in c.get("/t/pricing-101").text and "<i>n</i>" not in c.get("/t/pricing-101").text
+    taste = admin_id(c, "Notes on Taste")
+    c.post(f"/admin/a/{taste}/status", data={"status": "archived"})  # 专题里一篇都不剩
+    assert 'content="noindex,follow"' in c.get("/t/pricing-101").text and 'href="/t/pricing-101"' not in c.get("/").text
+    assert "https://chuhai.test/t/pricing-101" not in c.get("/sitemap.xml").text
+    c.post(f"/admin/a/{taste}/status", data={"status": "published"})
+    c.post(f"/admin/a/{aid}/status", data={"status": "published"})
+    c.post("/admin/topics/pricing-101/delete")
+    assert c.get("/t/pricing-101").status_code == 404 and 'href="/t/pricing-101"' not in c.get("/").text
+    c.post("/admin/logout")
+
+
+def test_indexnow(c, monkeypatch):
+    from app import indexnow
+    sent = []
+    monkeypatch.setattr(indexnow, "_send", sent.append)
+    assert c.get("/abcd1234efgh.txt").status_code == 404  # 没配密钥
+    assert signed(c, {**ART, "external_id": "x:in0", "title": "Indexnow Off"}).status_code == 200 and sent == []
+    monkeypatch.setenv("INDEXNOW_KEY", "abcd1234efgh")
+    k = c.get("/abcd1234efgh.txt")
+    assert k.status_code == 200 and k.text == "abcd1234efgh" and c.get("/wrongkey1.txt").status_code == 404
+    assert "GPTBot" in c.get("/robots.txt").text and c.get("/llms.txt").text.startswith("# chuhainews")  # 固定 .txt 不受影响
+
+    # WebHook：已发布的推；一直是草稿的不推；草稿转发布、发布转草稿都推
+    signed(c, {**ART, "external_id": "x:in1", "title": "Indexnow Live"})
+    assert sent[-1] == {"host": "chuhai.test", "key": "abcd1234efgh", "keyLocation": "https://chuhai.test/abcd1234efgh.txt",
+                        "urlList": ["https://chuhai.test/a/indexnow-live"]}
+    n = len(sent)
+    signed(c, {**ART, "external_id": "x:in2", "title": "Indexnow Draft", "status": "draft"})
+    signed(c, {**ART, "external_id": "x:in2", "title": "Indexnow Draft", "status": "draft"})
+    assert len(sent) == n
+    signed(c, {**ART, "external_id": "x:in2", "title": "Indexnow Draft"})
+    assert sent[-1]["urlList"] == ["https://chuhai.test/a/indexnow-draft"]
+    signed(c, {**ART, "external_id": "x:in1", "title": "Indexnow Live", "status": "draft"})
+    assert sent[-1]["urlList"] == ["https://chuhai.test/a/indexnow-live"]
+
+    # 后台：下架、重新发布都推
+    c.post("/admin/login", data={"password": "pw-test"})
+    aid = admin_id(c, "Indexnow Draft")
+    n = len(sent)
+    c.post(f"/admin/a/{aid}/status", data={"status": "archived"})
+    c.post(f"/admin/a/{aid}/status", data={"status": "published"})
+    assert len(sent) == n + 2 and sent[-1]["urlList"] == ["https://chuhai.test/a/indexnow-draft"]
+    c.post("/admin/logout")
+
+    # 非 https 站点不推
+    monkeypatch.setenv("SITE_URL", "http://127.0.0.1:8090")
+    n = len(sent)
+    assert indexnow.notify(["http://127.0.0.1:8090/a/x"]) is False and len(sent) == n

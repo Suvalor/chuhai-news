@@ -12,6 +12,7 @@
 {% if a.source_url %}<a href="{{ a.source_url }}" target="_blank" rel="noopener nofollow" class="btn-ink sm">{{ t.onX }} ↗</a>{% endif %}
 </div>
 </header>
+{% if a.summary %}<aside class="intro" aria-label="{{ t.introLabel }}"><span class="mono xs up red">{{ t.introLabel }}</span><p>{{ a.summary }}</p></aside>{% endif %}
 <div class="art-body" data-body>
 {% set tl = 'zh' if a.lang == 'en' else 'en' %}
 {% for p in a.paras %}{% set kind = p[2] if p | length > 2 else 'p' %}

@@ -63,6 +63,22 @@
 </section>
 {% endif %}
 
+{% if topics %}
+<section class="wrap sec">
+<div class="sec-hd" data-rv><h2 class="mono xs up">04 — {{ t.topics }}</h2></div>
+{% for tp in topics %}
+<a href="/t/{{ tp.key }}" class="idx idx-topic" data-rv>
+<span class="mono sm dim">{{ '%02d' % loop.index }}</span>
+<span class="idx-name"><b class="f-{{ font(tp.title) }}">{{ tp.title }}</b></span>
+<span class="idx-mid desk-only"><span>{{ tp.lead }}</span></span>
+<span class="mono sm idx-n">{{ count(tp.n) }}</span>
+<span class="idx-arrow" aria-hidden="true">→</span>
+{% if tp.lead %}<span class="idx-tag mob-only">{{ tp.lead }}</span>{% endif %}
+</a>
+{% endfor %}
+</section>
+{% endif %}
+
 {% elif view == 'cat' %}
 <section class="wrap mast">
 <nav class="chips" data-rv aria-label="{{ t.indexLabel }}">{% for c in cats %}<a href="/c/{{ c.key }}" class="tab mono sm{{ ' on' if c.key == cat.key }}">{{ '%02d' % loop.index }} {{ c.zh if ui == 'zh' else c.en }}</a>{% endfor %}</nav>
@@ -104,6 +120,45 @@
 {% if found_authors %}<div class="s-authors">{% for a in found_authors %}<a href="/u/{{ a.handle }}" class="s-au"><span class="avatar sm" aria-hidden="true">{{ a.name[:1] | upper }}</span><b>{{ a.name }}</b><span class="mono xs">{{ count(a.n) }}</span></a>{% endfor %}</div>{% endif %}
 </section>
 
+{% elif view == 'topic' %}
+<section class="wrap mast">
+<span class="mono xs up red" data-rv>{{ t.topics }} — {{ list_count }}</span>
+<h1 class="huge" data-rv><b class="f-{{ font(tp.title) }}">{{ tp.title }}</b></h1>
+{% if tp.intro %}<p class="deck-l" data-rv>{{ tp.intro }}</p>{% endif %}
+</section>
+
+{% elif view == 'about' %}
+<section class="wrap mast about">
+<span class="mono xs up red" data-rv>{{ t.about }}</span>
+{% if ui == 'zh' %}
+<h1 class="huge" data-rv><b class="f-zh">关于 chuhainews</b></h1>
+<p class="deck-l" data-rv>chuhainews 由 chuhainews 编辑部运营，收录 X 上值得读完的长文，配中文翻译，按想解决的问题分类。</p>
+<div class="prose" data-rv>
+<h2>选什么</h2>
+<ul><li>作者写的是自己做过的事，有一手经验，不是二手转述。</li><li>对出海或 AI 实操有用，读完能拿去用。</li><li>在 X 上互动高，书签和转发多的长文优先。</li></ul>
+<h2>怎么翻译</h2>
+<p>译文由 AI 翻译，<b>没有逐篇人工校对</b>，可能有误译。请以原文为准。每篇都可以切换回原文，也附有原帖链接。部分文章开头有「编者导读」，是编辑部自己的判断，不代表作者观点。</p>
+<h2>版权</h2>
+<p>原文版权归作者所有。每篇都标明作者和原帖链接。{% if email %}作者如果希望删除或更正，请写信到 <a href="mailto:{{ email }}">{{ email }}</a>，确认后会下架或修改。{% endif %}</p>
+<h2>给 AI 和开发者</h2>
+<p>站点导航见 <a href="/llms.txt">llms.txt</a>，全文合集见 <a href="/llms-full.txt">llms-full.txt</a>；每篇文章网址后加 <code>.md</code> 可取 Markdown 版本；新文章见 <a href="/feed.xml">RSS</a>；Agent 可通过 MCP（<code>/mcp</code>）检索。</p>
+</div>
+{% else %}
+<h1 class="huge" data-rv><b class="f-en">About chuhainews</b></h1>
+<p class="deck-l" data-rv>chuhainews is run by the chuhainews editors. We collect long reads from X worth finishing, add a Chinese translation, and sort them by the problem you want to solve.</p>
+<div class="prose" data-rv>
+<h2>What we pick</h2>
+<ul><li>Authors writing about things they have done themselves, not second-hand summaries.</li><li>Useful for going global or for hands-on work with AI.</li><li>High engagement on X: pieces with many bookmarks and reposts come first.</li></ul>
+<h2>How we translate</h2>
+<p>Translations are made by AI and <b>are not reviewed by a person</b>, so they may contain errors. The original is the reference: every article can be switched back to the original and links to the source post. Some articles open with an editor’s note; it is our own reading, not the author’s.</p>
+<h2>Copyright</h2>
+<p>Copyright stays with the authors. Every article names its author and links to the original post.{% if email %} Authors who want an article removed or corrected can write to <a href="mailto:{{ email }}">{{ email }}</a>; we take it down or fix it once confirmed.{% endif %}</p>
+<h2>For AI and developers</h2>
+<p>Site map for models: <a href="/llms.txt">llms.txt</a>; full text: <a href="/llms-full.txt">llms-full.txt</a>; add <code>.md</code> to any article URL for Markdown; new articles via <a href="/feed.xml">RSS</a>; agents can search over MCP at <code>/mcp</code>.</p>
+</div>
+{% endif %}
+</section>
+
 {% elif view == '404' %}
 <section class="wrap mast">
 <span class="mono xs up red">404</span>
@@ -112,12 +167,12 @@
 </section>
 {% endif %}
 
-{% if view in ('home', 'cat', 'author', 'saved') or (view == 'search' and q) %}
+{% if view in ('home', 'cat', 'author', 'saved', 'topic') or (view == 'search' and q) %}
 <section class="wrap list" id="rank">
 <div class="sec-hd list-hd" data-rv>
 <h2 class="mono xs up" data-list-label>{{ list_label }}</h2><span class="mono xs mute" data-list-count>{{ list_count if view != 'saved' }}</span>
 <span class="sp"></span>
-{% if view != 'saved' %}<nav class="sorts">{% for k, label in [('hot', t.hot), ('new', t.latest), ('views', t.views)] %}<a href="?{{ 'q=' ~ (q | urlencode) ~ '&' if q }}sort={{ k }}#rank" class="tab{{ ' on' if sort == k }}" rel="nofollow">{{ label }}</a>{% endfor %}</nav>{% endif %}
+{% if view not in ('saved', 'topic') %}<nav class="sorts">{% for k, label in [('hot', t.hot), ('new', t.latest), ('views', t.views)] %}<a href="?{{ 'q=' ~ (q | urlencode) ~ '&' if q }}sort={{ k }}#rank" class="tab{{ ' on' if sort == k }}" rel="nofollow">{{ label }}</a>{% endfor %}</nav>{% endif %}
 </div>
 <div data-rows>{% with offset = (page - 1) * 30 if page else 0 %}{% include "_rows.html" %}{% endwith %}</div>
 {% if view == 'saved' %}<p class="empty" data-empty hidden data-saved-empty="{{ t.savedEmpty }}" data-liked-empty="{{ t.likedEmpty }}"></p>
@@ -131,7 +186,7 @@
 
 <footer class="ft"><div class="wrap">
 <div class="mono xs up ft-row"><span>{{ t.footA }}</span><span>{{ t.footB }}</span></div>
-<nav class="mono xs ft-links"><a href="/feed.xml">RSS</a><a href="/llms.txt">llms.txt</a><a href="/sitemap.xml">Sitemap</a></nav>
+<nav class="mono xs ft-links"><a href="/about">{{ t.about }}</a><a href="/feed.xml">RSS</a><a href="/llms.txt">llms.txt</a><a href="/sitemap.xml">Sitemap</a></nav>
 <div class="ft-word" aria-hidden="true">chuhai<span class="red">.</span>news</div>
 </div></footer>
 

@@ -9,7 +9,7 @@ from datetime import datetime
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from . import db, limits
+from . import db, indexnow, limits
 from .ingest import block_text, join_blocks
 from .main import site_url, templates
 
@@ -39,6 +39,11 @@ def page(request, name, **kw):
     r = templates.TemplateResponse(request, "admin/" + name, {"base": site_url(request), **kw})
     r.headers["X-Robots-Tag"] = "noindex, nofollow"
     return r
+
+
+def ping(request, *paths):
+    """页面公开状态有变化时通知 IndexNow。"""
+    indexnow.notify([site_url(request) + p for p in paths])
 
 
 def guard(request):
@@ -91,8 +96,11 @@ def articles(request: Request, q: str = "", status: str = "", cat: str = "", aut
 def set_status(request: Request, id: int, status: str = Form(...)):
     if (r := guard(request)):
         return r
-    if status in db.STATUSES:
+    a = db.get_article(id=id, include_unpublished=True)
+    if a and status in db.STATUSES:
         db.update_article(id, {"status": status})
+        if "published" in (a["status"], status):
+            ping(request, f"/a/{a['slug']}")
     return RedirectResponse(request.headers.get("referer") or "/admin", 303)
 
 
@@ -100,7 +108,10 @@ def set_status(request: Request, id: int, status: str = Form(...)):
 def delete(request: Request, id: int):
     if (r := guard(request)):
         return r
+    a = db.get_article(id=id, include_unpublished=True)
     db.delete_article(id)
+    if a and a["status"] == "published":
+        ping(request, f"/a/{a['slug']}")
     return RedirectResponse("/admin", 303)
 
 
@@ -172,10 +183,14 @@ def save(request: Request, id: int = Form(0), title: str = Form(...), title_t: s
         if s:
             data["slug"] = s
         db.update_article(a["id"], data)
+        if "published" in (a["status"], data["status"]):  # 改了 slug 时旧网址也通知，让它下线
+            ping(request, f"/a/{a['slug']}", f"/a/{data.get('slug', a['slug'])}")
         return RedirectResponse(f"/admin/a/{a['id']}?saved=1", 303)
     new_slug, _ = db.upsert_article({**data, "external_id": f"admin:{time.time_ns()}", "slug": s,
                                      "author": {"handle": data["author"], "name": new_author_name.strip()},  # 空 = 不改已有作者名
                                      "status": data["status"]})
+    if data["status"] == "published":
+        ping(request, f"/a/{new_slug}")
     return RedirectResponse(f"/admin/a/{db.get_article(new_slug, include_unpublished=True)['id']}?saved=1", 303)
 
 
@@ -233,3 +248,89 @@ def webhooks(request: Request):
     if (r := guard(request)):
         return r
     return page(request, "webhooks.html", logs=db.webhook_logs(), configured=bool(os.getenv("WEBHOOK_SECRET")))
+
+
+def _topic_items(text):
+    """每行「slug | 入选理由」；返回 (items, 错误)。slug 必须是已有文章。"""
+    items, seen = [], set()
+    for line in text.replace("\r", "").splitlines():
+        if not line.strip():
+            continue
+        slug, _, note = line.partition("|")
+        slug = slug.strip().split("?")[0].rstrip("/").rsplit("/a/", 1)[-1].removesuffix(".md")
+        if not db.get_article(slug, include_unpublished=True):
+            return items, f"找不到文章「{slug}」"
+        if slug not in seen:
+            seen.add(slug)
+            items.append([slug, note.strip()])
+    return items, ""
+
+
+@router.get("/topics", response_class=HTMLResponse)
+def topics(request: Request):
+    if (r := guard(request)):
+        return r
+    return page(request, "topics.html", topics=db.topics())
+
+
+@router.post("/topics")
+def create_topic(request: Request, key: str = Form(...), title: str = Form(...)):
+    if (r := guard(request)):
+        return r
+    key, err = key.strip().lower(), ""
+    if not re.fullmatch(r"[a-z0-9_-]{1,60}", key):
+        err = "key 只能用小写字母、数字、-、_（1–60 位）"
+    elif not title.strip():
+        err = "标题不能为空"
+    elif not db.create_topic(key, title.strip()):
+        err = f"key「{key}」已存在"
+    if err:
+        r = page(request, "topics.html", topics=db.topics(), error=err, form={"key": key, "title": title})
+        r.status_code = 400
+        return r
+    return RedirectResponse(f"/admin/topics/{key}", 303)
+
+
+@router.get("/topics/{key}", response_class=HTMLResponse)
+def topic_form(request: Request, key: str):
+    if (r := guard(request)):
+        return r
+    tp = db.topic(key, include_draft=True)
+    if not tp:
+        return RedirectResponse("/admin/topics", 303)
+    text = "\n".join(f"{s} | {n}" if n else s for s, n in tp["items"])
+    return page(request, "topic.html", tp=tp, text=text, statuses=db.TOPIC_STATUSES, error="")
+
+
+@router.post("/topics/{key}")
+def save_topic(request: Request, key: str, title: str = Form(...), intro: str = Form(""), items: str = Form(""),
+               status: str = Form("draft"), sort: int = Form(0)):
+    if (r := guard(request)):
+        return r
+    tp = db.topic(key, include_draft=True)
+    if not tp:
+        return RedirectResponse("/admin/topics", 303)
+    parsed, err = _topic_items(items)
+    if not title.strip():
+        err = err or "标题不能为空"
+    status = status if status in db.TOPIC_STATUSES else "draft"
+    if err:
+        r = page(request, "topic.html", tp={**tp, "title": title, "intro": intro, "status": status, "sort": sort},
+                 text=items, statuses=db.TOPIC_STATUSES, error=err)
+        r.status_code = 400
+        return r
+    db.save_topic(key, title.strip(), intro.strip(), parsed, status, sort)
+    if "published" in (tp["status"], status):
+        ping(request, f"/t/{key}")
+    return RedirectResponse(f"/admin/topics/{key}?saved=1", 303)
+
+
+@router.post("/topics/{key}/delete")
+def delete_topic(request: Request, key: str):
+    if (r := guard(request)):
+        return r
+    tp = db.topic(key, include_draft=True)
+    db.delete_topic(key)
+    if tp and tp["status"] == "published":
+        ping(request, f"/t/{key}")
+    return RedirectResponse("/admin/topics", 303)

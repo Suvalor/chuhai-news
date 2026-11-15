@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS articles (
 CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(status, published_at);
 CREATE TABLE IF NOT EXISTS interactions (
   who TEXT NOT NULL, slug TEXT NOT NULL, kind TEXT NOT NULL, ts TEXT NOT NULL, PRIMARY KEY (who, slug, kind));
+CREATE TABLE IF NOT EXISTS topics (
+  key TEXT PRIMARY KEY, title TEXT NOT NULL, intro TEXT DEFAULT '',
+  items TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'draft', sort INTEGER DEFAULT 0, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS webhook_nonces (sig TEXT PRIMARY KEY, ts INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS webhook_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, ok INTEGER NOT NULL,
@@ -162,6 +165,12 @@ def get_article(slug=None, id=None, include_unpublished=False):
         sql += " AND a.status='published'"
     with connect() as con:
         return _row(con.execute(sql, (slug if slug is not None else id,)).fetchone())
+
+
+def article_status(external_id):
+    with connect() as con:
+        r = con.execute("SELECT status FROM articles WHERE external_id=?", (external_id,)).fetchone()
+        return r[0] if r else None
 
 
 def context_list(a, ctx):
@@ -305,6 +314,48 @@ def delete_article(id):
 def update_author(handle, name, bio_zh, bio_en):
     with connect() as con:
         con.execute("UPDATE authors SET name=?, bio_zh=?, bio_en=? WHERE handle=?", (name, bio_zh, bio_en, handle))
+
+
+TOPIC_STATUSES = ("published", "draft")
+
+
+def topics(status=None):
+    """专题列表；items 为 [[slug, 入选理由], ...]，按编辑给定顺序。"""
+    sql = "SELECT * FROM topics" + (" WHERE status=?" if status else "") + " ORDER BY sort, updated_at DESC"
+    with connect() as con:
+        rows = [dict(r) for r in con.execute(sql, (status,) if status else ())]
+    for r in rows:
+        r["items"] = json.loads(r["items"])
+    return rows
+
+
+def topic(key, include_draft=False):
+    return next((t for t in topics(None if include_draft else "published") if t["key"] == key), None)
+
+
+def topic_articles(t):
+    """专题里仍已发布的文章，保持编辑顺序，带上入选理由 note。"""
+    notes = dict((s, n) for s, n in t["items"])
+    rows = {r["slug"]: r for r in list_articles(slugs=list(notes), limit=len(notes) or 1)}
+    return [{**rows[s], "note": notes[s]} for s, _ in t["items"] if s in rows]
+
+
+def save_topic(key, title, intro, items, status, sort):
+    with connect() as con:
+        con.execute("UPDATE topics SET title=?, intro=?, items=?, status=?, sort=?, updated_at=? WHERE key=?",
+                    (title, intro, json.dumps(items, ensure_ascii=False), status, sort, now_iso(), key))
+
+
+def create_topic(key, title):
+    """新建草稿专题；key 已存在返回 False。"""
+    with connect() as con:
+        return con.execute("INSERT OR IGNORE INTO topics(key,title,updated_at) VALUES (?,?,?)",
+                           (key, title, now_iso())).rowcount == 1
+
+
+def delete_topic(key):
+    with connect() as con:
+        con.execute("DELETE FROM topics WHERE key=?", (key,))
 
 
 def update_category(key, zh, en, tag_zh, tag_en, sort):

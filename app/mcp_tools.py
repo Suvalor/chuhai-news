@@ -67,6 +67,13 @@ def list_authors() -> list[dict]:
 
 
 @mcp.tool()
+def list_topics() -> list[dict]:
+    """列出编辑部策划的专题：每个专题有导语和按顺序排列的文章，note 是该篇的入选理由。"""
+    return [{"key": t["key"], "title": t["title"], "intro": t["intro"], "url": f"{_base()}/t/{t['key']}",
+             "articles": [{**_card(a), "note": a["note"]} for a in db.topic_articles(t)]} for t in db.topics("published")]
+
+
+@mcp.tool()
 def publish_articles(articles: list[dict], ctx: Context) -> dict:
     """推送文章：新建，或按 external_id 更新（再推同一篇 = 更新）。每批 1–100 篇，整批校验，一篇不合法则整批不写入。
     需要 MCP 连接的请求头带 `Authorization: Bearer <令牌>`（MCP_WRITE_TOKEN，未设置则为 WEBHOOK_SECRET）。字段与 WebHook（GET /api/webhook）完全相同；

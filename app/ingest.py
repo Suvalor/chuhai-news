@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from . import db
+from . import db, indexnow
 
 # 推送参数的 JSON Schema：GET /api/webhook 原样返回，MCP 写入工具也用它作参数定义
 SCHEMA = json.loads((Path(__file__).parent / "webhook_schema.json").read_text())
@@ -169,10 +169,14 @@ def publish(items, base, via="WebHook"):
         except ValueError as e:
             db.log_webhook(False, 422, f"{via}：第 {i} 篇：{e}")
             raise BatchError(str(e), i)
-    results = []
+    results, changed = [], []
     for d in clean:
+        was = db.article_status(d["external_id"])
         slug, created = db.upsert_article(d)
         results.append({"external_id": d["external_id"], "slug": slug, "created": created, "url": f"{base}/a/{quote(slug)}"})
+        if "published" in (was, d["status"]):  # 新发布、更新或下架都通知；一直是草稿的不外泄
+            changed.append(results[-1]["url"])
+    indexnow.notify(changed)
     db.log_webhook(True, 200, f"{via}：入库 {len(results)} 篇（新建 {sum(r['created'] for r in results)}）",
                    [r["external_id"] for r in results])
     return results

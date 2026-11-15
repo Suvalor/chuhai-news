@@ -6,6 +6,7 @@
 <div class="meta"><a href="/c/{{ it.cat }}" class="ink">{{ it.cat_name }}</a><span>—</span><a href="/u/{{ it.author }}" class="au">{{ it.author_name }}</a><span>— <time datetime="{{ it.published_at }}">{{ it.date_label }}</time></span></div>
 <h3 class="row-title f-{{ it.f }}"><a href="/a/{{ it.slug }}" class="stretch">{{ it.title }}</a></h3>
 {% if it.title_t %}<div class="row-deck" lang="{{ 'zh' if it.lang == 'en' else 'en' }}">{{ it.title_t }}</div>{% endif %}
+{% if it.note %}<p class="row-note"><span class="red">↳</span> {{ it.note }}</p>{% endif %}
 <div class="row-m mob-only"><span>{{ t.read }} {{ it.views_f }}</span><span class="lk" data-like-mark="{{ it.slug }}">♥ {{ it.likes_f }}</span><span>{{ it.mins }} {{ t.min }}</span><span>{{ it.lang_short }}</span></div>
 </div>
 <div class="row-side desk-only">

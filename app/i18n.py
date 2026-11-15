@@ -15,7 +15,7 @@ T = {
                keys="← → 切换 · T 翻译 · L 赞 · S 收藏 · ESC 返回", transTo="AI 整篇翻译 · 原文为", langEn="英文",
                langZh="中文", origEn="英文原文", origZh="中文原文", short_en="EN", short_zh="中", upNext="接着读",
                flowMore="继续下滑，下一篇会自动接上", flowEnd="这一组读完了。换到「同类目」继续。", footA="只收录值得读完的长文",
-               footB="原文版权归作者所有", authorsUnit="位作者", prev="上一页", nextPage="下一页", readSource="阅读原帖",
+               footB="原文版权归作者所有", authorsUnit="位作者", prev="上一页", nextPage="下一页", readSource="阅读原帖", introLabel="编者导读", about="关于", topics="专题",
                ring="值得读完的长文 · LONG READS WORTH FINISHING · ",
                siteDesc="chuhainews 精选 X 上值得读完的长文：原文阅读、一键中英翻译，按认知、挣钱、AI、工具、出海、创作六类问题整理。"),
     "en": dict(discover="Discover", saved="Saved", search="Search", searchPh="Titles, authors, topics",
@@ -36,7 +36,7 @@ T = {
                upNext="Up next", flowMore="Keep scrolling — the next one follows",
                flowEnd="That’s this set. Switch to “Same topic” to continue.", footA="Only long reads worth finishing",
                footB="All rights remain with the authors", authorsUnit="authors", prev="Previous", nextPage="Next page",
-               readSource="Read the original", ring="LONG READS WORTH FINISHING · 值得读完的长文 · ",
+               readSource="Read the original", introLabel="Editor’s note", about="About", topics="Topics", ring="LONG READS WORTH FINISHING · 值得读完的长文 · ",
                siteDesc="chuhainews curates long reads from X worth finishing — original text with one-tap translation, "
                         "organised by the problem you want to solve."),
 }

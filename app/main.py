@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import db, limits
+from . import db, indexnow, limits
 from .i18n import HOT_QUERIES, T, count, fmt
 from .ingest import SCHEMA as WEBHOOK_SCHEMA, BatchError, publish
 from .limits import client_ip
@@ -145,11 +145,13 @@ def home(request: Request):
         c["top"] = top[0]["title"] if top else ""
     featured = deco(db.list_articles(limit=1), ui)
     authors = db.authors()
+    topics = topic_cards(ui)
     lst = listing(request, ui)
     total = sum(c["n"] for c in cats)
     t = T[ui]
     return render(request, "index.html", view="home", cats=cats, featured=featured[0] if featured else None,
-                  authors=authors, total=total, list_label="04 — " + t["rankLabel"], list_count=count(total, ui),
+                  authors=authors, topics=topics, total=total, list_count=count(total, ui),
+                  list_label=("05" if topics else "04") + " — " + t["rankLabel"],
                   title="chuhainews — " + ("值得读完的长文" if ui == "zh" else "Long reads worth finishing"),
                   description=t["siteDesc"], canonical=base + "/",
                   ld=[website_ld(base, ui), list_ld(base, t["rankLabel"], base + "/", lst["items"])], **lst)
@@ -211,6 +213,46 @@ def saved(request: Request):
     ui = ui_of(request)
     return render(request, "index.html", view="saved", items=[], title=T[ui]["saved"] + " — chuhainews",
                   description=T[ui]["siteDesc"], robots="noindex,follow")
+
+
+def topic_cards(ui):
+    """已发布且至少有一篇在架文章的专题。"""
+    out = []
+    for tp in db.topics("published"):
+        n = len(db.topic_articles(tp))
+        if n:
+            out.append({**tp, "n": n, "lead": first_sentence(tp["intro"])})
+    return out
+
+
+@app.get("/t/{key}", response_class=HTMLResponse)
+def topic_page(request: Request, key: str):
+    ui, base = ui_of(request), site_url(request)
+    tp = db.topic(key)
+    if not tp:
+        return not_found(request)
+    items = deco(db.topic_articles(tp), ui)
+    url = f"{base}/t/{key}"
+    return render(request, "index.html", view="topic", tp=tp, items=items, sort="topic", page=None, has_more=False,
+                  list_label=T[ui]["topics"], list_count=count(len(items), ui), title=f"{tp['title']} — chuhainews",
+                  description=tp["intro"][:160] or tp["title"], canonical=url,
+                  robots="index,follow" if items else "noindex,follow",  # 文章全下架的专题不进索引
+                  ld=[{**list_ld(base, tp["title"], url, items), **({"description": tp["intro"]} if tp["intro"] else {})},
+                      crumbs_ld([("chuhainews", base + "/"), (tp["title"], url)])])
+
+
+@app.get("/about", response_class=HTMLResponse)
+def about(request: Request):
+    ui, base = ui_of(request), site_url(request)
+    email = os.getenv("CONTACT_EMAIL", "").strip()
+    org = {"@type": "Organization", "name": "chuhainews", "url": base + "/", **({"email": email} if email else {})}
+    ld = {"@context": "https://schema.org", "@type": "AboutPage", "url": base + "/about", "inLanguage": ["zh-CN", "en"],
+          "mainEntity": org}
+    return render(request, "index.html", view="about", email=email, items=[],
+                  title=T[ui]["about"] + " — chuhainews", canonical=base + "/about",
+                  description="chuhainews 由 chuhainews 编辑部运营：选文标准、AI 翻译说明、版权与删除联系方式。" if ui == "zh" else
+                  "Who runs chuhainews, how articles are picked and translated, and how authors can request removal.",
+                  ld=[ld, crumbs_ld([("chuhainews", base + "/"), (T[ui]["about"], base + "/about")])])
 
 
 def article_ctx(a, ui, base):
@@ -333,6 +375,8 @@ def sitemap(request: Request):
     base = site_url(request)
     arts = db.list_articles(sort="new", limit=50000)
     urls = [(base + "/", arts[0]["updated_at"] if arts else None)]
+    urls += [(base + "/about", None)]
+    urls += [(f"{base}/t/{tp['key']}", tp["updated_at"]) for tp in topic_cards("zh")]
     urls += [(f"{base}/c/{c['key']}", None) for c in db.categories() if c["n"]]
     urls += [(f"{base}/u/{a['handle']}", None) for a in db.authors() if a["n"]]
     urls += [(f"{base}/a/{a['slug']}", a["updated_at"]) for a in arts]
@@ -358,6 +402,35 @@ def feed(request: Request):
                     f"<language>zh-cn</language>{items}</channel></rss>", media_type="application/rss+xml")
 
 
+
+# ---------- 只读 JSON（给外部信源聚合拉取，范围与 RSS 相同） ----------
+
+def article_brief(a, base):
+    return {"slug": a["slug"], "url": f"{base}/a/{a['slug']}", "source_url": a["source_url"], "lang": a["lang"],
+            "category": a["cat"], "category_zh": a["cat_zh"], "title": a["title"], "title_translated": a["title_t"],
+            "summary": a["summary"] or excerpt(a, 300), "author": {"handle": a["author"], "name": a["author_name"]},
+            "published_at": a["published_at"], "updated_at": a["updated_at"],
+            "views": a["views"], "likes": a["likes"], "saves": a["saves"]}
+
+
+@app.get("/api/articles")
+def api_articles(request: Request, limit: int = 50, category: str | None = None):
+    """最新发布的文章（按发布时间倒序，最多 100 篇）；正文与逐段译文用 /api/articles/{slug}。"""
+    base = site_url(request)
+    arts = db.list_articles(cat=category, sort="new", limit=max(1, min(limit, 100)), with_body=True)
+    return {"site": base, "articles": [article_brief(a, base) for a in arts]}
+
+
+@app.get("/api/articles/{slug}")
+def api_article(request: Request, slug: str):
+    a = db.get_article(slug)
+    if not a:
+        return JSONResponse({"error": "not found"}, 404)
+    kinds = {"h2": "heading", "img": "image"}
+    paras = [{"type": kinds.get(p[2] if len(p) > 2 else "p", "paragraph"), "text": p[0], "translation": p[1],
+              **({"src": p[3]} if len(p) > 3 else {})} for p in a["paras"]]
+    return {**article_brief({**a, "author_name": a["author_name"]}, site_url(request)), "paragraphs": paras}
+
 def excerpt(a, n=160):
     """没填摘要时的描述：取开头几段正文（跳过小标题和配图）凑满 n 字。"""
     text, sep = "", "" if a["lang"] == "zh" else " "
@@ -367,6 +440,10 @@ def excerpt(a, n=160):
             if len(text) >= n:
                 return text[:n - 1].rstrip() + "…"
     return text
+
+
+def first_sentence(s):
+    return re.split(r"(?<=[。！？!?])|(?<=\.)\s", (s or "").strip(), maxsplit=1)[0].strip()
 
 
 def md_block(p, i):
@@ -380,7 +457,10 @@ def to_markdown(a, base):
         lines += [f"> {a['title_t']}", ""]
     lines += [f"- 作者 / Author: {a['author_name']} (@{a['author']})", f"- 类目 / Topic: {a['cat_zh']} / {a['cat_en']}",
               f"- 发布 / Published: {a['published_at'][:10]}", f"- 原文语言 / Language: {a['lang']}",
-              f"- 原帖 / Source: {a['source_url'] or '—'}", f"- 本页 / Canonical: {base}/a/{a['slug']}", "", "## 原文 / Original", ""]
+              f"- 原帖 / Source: {a['source_url'] or '—'}", f"- 本页 / Canonical: {base}/a/{a['slug']}", ""]
+    if a["summary"]:
+        lines += ["## 编者导读 / Editor's note", "", a["summary"], ""]
+    lines += ["## 原文 / Original", ""]
     lines += [md_block(p, 0) + "\n" for p in a["paras"]]
     if a["has_trans"]:
         lines += ["## 译文 / Translation", ""] + [md_block(p, 1) + "\n" for p in a["paras"] if p[1] or len(p) > 3]
@@ -393,14 +473,22 @@ def llms(request: Request):
     base = site_url(request)
     out = [f"# chuhainews", "", f"> {T['zh']['siteDesc']}", "> " + T["en"]["siteDesc"], "",
            "每篇文章都有 Markdown 版本：在文章网址后加 `.md`。全文合集见 llms-full.txt。",
+           f"运营方、选文标准、翻译方式（AI 翻译，未逐篇校对）与版权联系：{base}/about",
            f"Agent 可通过 MCP（Streamable HTTP）查询：{base}/mcp", ""]
+    tps = topic_cards("zh")
+    if tps:
+        out += ["## 专题 / Topics", ""]
+        out += [f"- [{tp['title']}]({base}/t/{tp['key']}): {tp['n']} 篇" + (f" — {tp['lead']}" if tp["lead"] else "")
+                for tp in tps]
+        out.append("")
     for c in db.categories():
         arts = db.list_articles(cat=c["key"], sort="hot", limit=30)
         if not arts:
             continue
         out += [f"## {c['zh']} / {c['en']}", ""]
-        out += [f"- [{a['title']}]({base}/a/{a['slug']}.md): {a['author_name']}" + (f" — {a['title_t']}" if a["title_t"] else "")
-                for a in arts]
+        for a in arts:
+            note = first_sentence(a["summary"]) or a["title_t"]
+            out.append(f"- [{a['title']}]({base}/a/{a['slug']}.md): {a['author_name']}" + (f" — {note}" if note else ""))
         out.append("")
     out += ["## Optional", "", f"- [全文合集]({base}/llms-full.txt)", f"- [RSS]({base}/feed.xml)", f"- [Sitemap]({base}/sitemap.xml)"]
     return "\n".join(out)
@@ -412,6 +500,13 @@ def llms_full(request: Request):
     # shortcut: 一次拼出最近 200 篇全文；文章更多时改为分页或按类目拆文件
     arts = [db.get_article(a["slug"]) for a in db.list_articles(sort="new", limit=200)]
     return "\n\n".join(to_markdown(a, base) for a in arts if a)
+
+
+@app.get("/{name}.txt", response_class=PlainTextResponse)
+def indexnow_key(request: Request, name: str):
+    """IndexNow 密钥文件：搜索引擎用它确认推送来自站长。"""
+    k = indexnow.key()
+    return PlainTextResponse(k) if k and name == k else not_found(request)
 
 
 # ---------- WebHook ----------
