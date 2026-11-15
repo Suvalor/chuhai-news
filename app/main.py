@@ -91,11 +91,12 @@ def deco(rows, ui):
 def render(request, name, status=200, **kw):
     ui = ui_of(request)
     base = site_url(request)
+    now = datetime.now()
     kw.setdefault("canonical", base + request.url.path)
     kw.setdefault("robots", "index,follow,max-image-preview:large,max-snippet:-1")
     return templates.TemplateResponse(request, name, {
         "ui": ui, "t": T[ui], "base": base, "path": request.url.path, "font": font, "fmt": fmt,
-        "count": lambda n: count(n, ui), "today": datetime.now().strftime("%Y.%m.%d"), **kw}, status_code=status)
+        "count": lambda n: count(n, ui), "today": now.strftime("%Y.%m.%d"), "year": now.year, **kw}, status_code=status)
 
 
 def website_ld(base, ui):
