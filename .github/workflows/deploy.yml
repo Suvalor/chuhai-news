@@ -19,7 +19,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Run tests with locked dependencies
-        run: pipx run --spec uv==0.11.6 uv run --locked --python 3.13 pytest -q
+        run: pipx run --spec uv==0.11.6 uv run --locked --python 3.13 python -m pytest -q
       - name: Build the production image
         run: docker build .
 
