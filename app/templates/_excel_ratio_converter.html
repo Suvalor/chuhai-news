@@ -1,0 +1,81 @@
+<section class="wrap excel-tool">
+  <header class="page-header">
+    <div>
+      <h1>{{ t.excelRatio }}</h1>
+      <p class="header-note">{{ t.excelDesc }}</p>
+    </div>
+  </header>
+
+  <section class="workspace" aria-label="{{ t.excelRatio }}">
+    <section class="panel source-panel">
+      <header class="panel-header">
+        <h2 class="panel-title">{{ '输入数据' if ui == 'zh' else 'Source data' }}</h2>
+        <span class="panel-meta" id="inputMeta">{{ '0 行 · 0 列' if ui == 'zh' else 'Rows: 0 · Columns: 0' }}</span>
+      </header>
+      <div class="panel-body">
+        <label class="section-label" for="sourceInput">{{ '粘贴 Excel 数据' if ui == 'zh' else 'Paste Excel data' }}</label>
+        <textarea class="paste-area" id="sourceInput" spellcheck="false"
+          placeholder="{{ '例如，第一列填张三/李四，第二列填100' if ui == 'zh' else 'For example, put Alice/Bob in the first column and 100 in the second' }}"></textarea>
+        <p class="hint">{{ '从 Excel 复制单元格区域，按制表符识别列、按换行识别行。' if ui == 'zh' else 'Copy a range of Excel cells. Tabs separate columns and line breaks separate rows.' }}</p>
+      </div>
+    </section>
+
+    <div class="panel lists-panel">
+      <section class="list-column" aria-labelledby="input-list-title">
+        <div class="list-column-header">
+          <h2 class="list-column-title" id="input-list-title">{{ '原表预览' if ui == 'zh' else 'Source preview' }}</h2>
+          <span class="panel-meta" id="inputListMeta">{{ '0 行 · 0 列' if ui == 'zh' else 'Rows: 0 · Columns: 0' }}</span>
+        </div>
+        <div id="inputPreview" class="empty-state">{{ '粘贴 Excel 数据后，此处显示行列预览。' if ui == 'zh' else 'Paste Excel data to preview its rows and columns.' }}</div>
+      </section>
+      <section class="list-column" aria-labelledby="formula-list-title">
+        <div class="list-column-header">
+          <h2 class="list-column-title" id="formula-list-title">{{ '逐行分配比例' if ui == 'zh' else 'Allocation by row' }}</h2>
+          <span class="panel-meta" id="formulaMeta">{{ '0 行待分配' if ui == 'zh' else 'Rows to allocate: 0' }}</span>
+        </div>
+        <div class="formula-stack">
+          <div id="formulaList" class="empty-state">{{ '粘贴数据后，此处生成逐行分配公式。' if ui == 'zh' else 'Paste data to see the allocation for each row.' }}</div>
+          <p class="hint">{{ '第一列用 / 分隔姓名。默认平均分配，修改一项后其余项平分剩下的比例。' if ui == 'zh' else 'Separate names with / in the first column. Shares start equal. When one changes, the others split the remainder.' }}</p>
+          <button class="primary-button" id="convertButton" type="button">{{ '生成汇总结果' if ui == 'zh' else 'Calculate totals' }}</button>
+          <button class="secondary-button" id="resetButton" type="button">{{ '清空重置' if ui == 'zh' else 'Reset' }}</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel output-panel">
+      <header class="panel-header">
+        <h2 class="panel-title">{{ '汇总结果' if ui == 'zh' else 'Results by name' }}</h2>
+        <span class="panel-meta" id="outputMeta" role="status">{{ '等待转换' if ui == 'zh' else 'Awaiting conversion' }}</span>
+      </header>
+      <div class="panel-body">
+        <div class="summary">
+          <div class="summary-item"><strong class="summary-value" id="rowCount">0</strong><span class="summary-name">{{ '数据行' if ui == 'zh' else 'Rows' }}</span></div>
+          <div class="summary-item"><strong class="summary-value" id="columnCount">0</strong><span class="summary-name">{{ '数据列' if ui == 'zh' else 'Columns' }}</span></div>
+          <div class="summary-item"><strong class="summary-value" id="numberCount">0</strong><span class="summary-name">{{ '已转换数字' if ui == 'zh' else 'Numeric results' }}</span></div>
+        </div>
+        <div id="outputPreview" class="empty-state">{{ '完成转换后，此处显示输出结果。' if ui == 'zh' else 'The converted results will appear here.' }}</div>
+        <button class="primary-button" id="copyButton" type="button" disabled>{{ '复制结果到 Excel' if ui == 'zh' else 'Copy results to Excel' }}</button>
+        <p id="copyStatus" class="hint" role="status"></p>
+      </div>
+    </section>
+  </section>
+
+  <section class="guide" aria-labelledby="excel-guide">
+    {% if ui == 'zh' %}
+    <h2 id="excel-guide">Excel 怎么按比例分摊金额？</h2>
+    <p>复制表格数据行，在第一列用斜杠分隔姓名，其余列填金额或其他数值。输入小数比例，例如 0.6 表示 60%。生成汇总后，同名记录按列相加，结果可以粘贴回 Excel。</p>
+    <h2>60/40 分账示例</h2>
+    <p>第一列填 <code>张三/李四</code>，第二列填 <code>1000</code>。把张三的比例改为 <code>0.6</code>，李四自动分到 <code>0.4</code>，结果分别是 600 和 400。</p>
+    <h2>数据会上传吗？</h2>
+    <p>表格计算在当前浏览器中完成，粘贴的单元格内容不会发送到站点服务器。请从 Excel 复制单元格区域，本工具读取其中的文本和值。</p>
+    {% else %}
+    <h2 id="excel-guide">How do you split amounts proportionally in Excel?</h2>
+    <p>Copy the data rows. Separate names with slashes in the first column and put numeric values in the other columns. Enter shares as decimals, such as 0.6 for 60%. The converter sums matching names by column and lets you paste the results back into Excel.</p>
+    <h2>Example of a 60/40 split</h2>
+    <p>Put <code>Alice/Bob</code> in the first column and <code>1000</code> in the second. Set Alice’s share to <code>0.6</code>. Bob’s share becomes <code>0.4</code>, giving totals of 600 and 400.</p>
+    <h2>Is my spreadsheet data uploaded?</h2>
+    <p>Calculation runs in your browser. Pasted cell contents never go to the site’s server. Copy a range of cells from Excel so the converter can read the pasted values and text.</p>
+    {% endif %}
+  </section>
+</section>
+<script src="{{ asset('excel-ratio-converter.js') }}" defer></script>

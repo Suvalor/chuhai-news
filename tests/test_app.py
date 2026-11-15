@@ -98,6 +98,24 @@ def test_seo_geo_endpoints(c):
     assert "品味不是天赋。" in c.get("/llms-full.txt").text
 
 
+def test_excel_ratio_converter_discovery(c):
+    path = "/tools/excel-ratio-converter"
+    url = f"https://chuhai.test{path}"
+    home = c.get("/").text
+    assert home.count(f'href="{path}"') == 2  # 页脚和手机固定导航
+    footer = home.split("<footer", 1)[1].split("</footer>", 1)[0]
+    assert f'href="{path}"' in footer and 'href="/feed.xml"' in footer
+    assert 'href="/sitemap.xml"' not in footer and 'href="/llms.txt"' not in footer
+    assert 'href="/llms.txt"' in c.get("/about").text
+    page = c.get(path)
+    assert page.status_code == 200 and f'<link rel="canonical" href="{url}">' in page.text
+    assert '<h1>Excel 比例分摊计算器</h1>' in page.text and '"@type": "WebApplication"' in page.text
+    assert 'id="sourceInput"' in page.text and "googletagmanager.com" not in page.text
+    assert '<h1>Excel Ratio Converter</h1>' in c.get(path, headers={"Cookie": "ui=en"}).text
+    locs = [e.text for e in ET.fromstring(c.get("/sitemap.xml").content).iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")]
+    assert url in locs and url in c.get("/llms.txt").text
+
+
 def test_like_counts_never_negative(c):
     assert c.post("/api/a/notes-on-taste/like").json() == {"likes": 1}
     assert c.post("/api/a/notes-on-taste/unlike").json() == {"likes": 0}

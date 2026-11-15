@@ -1,0 +1,373 @@
+.excel-tool button,
+.excel-tool input,
+.excel-tool textarea {
+  font: inherit;
+}
+
+.excel-tool { padding-top: 40px; padding-bottom: 48px; }
+
+.excel-tool .page-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.excel-tool h1 {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 38px);
+  letter-spacing: -0.03em;
+}
+
+.excel-tool .header-note {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.excel-tool .workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.excel-tool .panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+}
+
+.excel-tool .source-panel {
+  min-height: auto;
+}
+
+.excel-tool .lists-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: visible;
+}
+
+.excel-tool .list-column {
+  min-width: 0;
+  padding: 20px;
+}
+
+.excel-tool .list-column + .list-column {
+  border-left: 1px solid var(--line);
+}
+
+.excel-tool .list-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  margin-bottom: 10px;
+}
+
+.excel-tool .list-column-title {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.excel-tool .output-panel {
+  min-height: 420px;
+}
+
+.excel-tool .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 68px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.excel-tool .panel-title {
+  margin: 0;
+  font-size: 17px;
+}
+
+.excel-tool .panel-meta {
+  color: var(--mute);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.excel-tool .panel-.section-label {
+  display: block;
+  margin-bottom: 10px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.excel-tool .paste-area {
+  display: block;
+  width: 100%;
+  min-height: 260px;
+  padding: 14px;
+  resize: vertical;
+  color: #0f172a;
+  background: #f8fafc;
+  border: 1px solid var(--track);
+  border-radius: 10px;
+  line-height: 1.6;
+  tab-size: 4;
+}
+
+.excel-tool .paste-area:focus {
+  outline: 3px solid var(--track);
+  border-color: var(--ink);
+}
+
+.excel-tool .hint {
+  margin: 9px 0 18px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.excel-tool .table-shell {
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+}
+
+.excel-tool table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.excel-tool th,
+.excel-tool td {
+  height: 38px;
+  padding: 8px 10px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.excel-tool th:first-child,
+.excel-tool td:first-child {
+  width: 50%;
+}
+
+.excel-tool .paired-table {
+  table-layout: auto;
+}
+
+.excel-tool .paired-table th:first-child,
+.excel-tool .paired-table td:first-child {
+  width: auto;
+}
+
+.excel-tool .paired-table th:not(:first-child),
+.excel-tool .paired-table td:not(:first-child) {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.excel-tool th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #475569;
+  background: #f1f5f9;
+  font-weight: 700;
+}
+
+.excel-tool th:last-child,
+.excel-tool td:last-child {
+  border-right: 0;
+}
+
+.excel-tool tr:last-child td {
+  border-bottom: 0;
+}
+
+.excel-tool .formula-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.excel-tool .formula-list {
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+}
+
+.excel-tool .formula-cell {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.excel-tool .formula-members {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.excel-tool .member-ratio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.excel-tool .member-name {
+  max-width: 90px;
+  overflow: hidden;
+  color: #0f172a;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.excel-tool .ratio-input {
+  width: 64px;
+  height: 30px;
+  padding: 0 7px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--track);
+  border-radius: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.excel-tool .ratio-input:focus {
+  outline: 2px solid var(--track);
+  border-color: var(--ink);
+}
+
+.excel-tool .formula-total {
+  color: #16a34a;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.excel-tool .primary-button,
+.excel-tool .secondary-button {
+  width: 100%;
+  height: 44px;
+  border-radius: 9px;
+  border: 0;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.excel-tool .primary-button {
+  color: white;
+  background: var(--ink);
+}
+
+.excel-tool .primary-button:hover {
+  background: var(--red);
+}
+
+.excel-tool .primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.excel-tool .secondary-button {
+  color: #334155;
+  background: var(--line);
+}
+
+.excel-tool .secondary-button:hover {
+  background: var(--track);
+}
+
+.excel-tool .summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.excel-tool .summary-item {
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.excel-tool .summary-value {
+  display: block;
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 750;
+}
+
+.excel-tool .summary-name {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.excel-tool .empty-state {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  padding: 30px;
+  color: var(--mute);
+  background: #f8fafc;
+  border: 1px dashed var(--track);
+  border-radius: 10px;
+  text-align: center;
+  line-height: 1.6;
+}
+
+@media (max-width: 980px) {
+  .excel-tool .lists-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .excel-tool .list-column + .list-column {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .excel-tool .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .excel-tool .summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+.excel-tool .guide { max-width: 760px; margin-top: 36px; line-height: 1.7; }
+.excel-tool .guide h2 { margin-top: 20px; font-size: 21px; }
+.excel-tool .guide p { margin-top: 6px; }
+.excel-tool #copyButton { margin-top: 16px; }

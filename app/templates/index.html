@@ -159,6 +159,9 @@
 {% endif %}
 </section>
 
+{% elif view == 'excel-ratio' %}
+{% include "_excel_ratio_converter.html" %}
+
 {% elif view == '404' %}
 <section class="wrap mast">
 <span class="mono xs up red">404</span>
@@ -203,9 +206,8 @@
     <div>
       <h2 id="footer-resources">{{ t.footResources }}</h2>
       <ul aria-labelledby="footer-resources">
+        <li><a href="{{ url_for('excel_ratio_converter').path }}">{{ t.excelRatio }}</a></li>
         <li><a href="/feed.xml">{{ t.footFeed }}</a></li>
-        <li><a href="/sitemap.xml">{{ t.footSitemap }}</a></li>
-        <li><a href="/llms.txt">llms.txt</a></li>
       </ul>
     </div>
   </nav>
@@ -214,5 +216,8 @@
 </div>
 </footer>
 
-<nav class="mnav mob-only" aria-label="{{ t.discover }}">{{ m.navlinks(view, t, 'mnav-i') }}</nav>
+<nav class="mnav mob-only" aria-label="{{ t.discover }}">
+  {{ m.navlinks(view, t, 'mnav-i') }}
+  <a href="{{ url_for('excel_ratio_converter').path }}" class="mnav-i{{ ' on' if view == 'excel-ratio' }}"{% if view == 'excel-ratio' %} aria-current="page"{% endif %}><i class="dot" aria-hidden="true"></i>{{ t.tools }}</a>
+</nav>
 {% endblock %}
