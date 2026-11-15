@@ -89,6 +89,7 @@ h1, h2, h3, p { margin: 0; }
 .idx:hover { background: var(--ink); color: var(--paper); }
 .idx-name { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; min-width: 0; }
 .idx-name b { font-weight: 600; font-synthesis: none; font-size: clamp(30px, calc(30px + 30 * (100vw - 375px) / 985), 60px); line-height: 1; letter-spacing: -.02em; }
+.idx-topic .idx-name b { font-size: clamp(22px, calc(22px + 14 * (100vw - 375px) / 985), 36px); line-height: 1.2; text-wrap: balance; }
 .idx-name i, .huge i { font-family: var(--serif-en); font-style: italic; font-size: clamp(16px, calc(16px + 8 * (100vw - 375px) / 985), 24px); opacity: .55; }
 .idx-mid { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 14px; line-height: 1.5; opacity: .8; }
 .idx-top { font-size: 17px; line-height: 1.35; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -175,6 +176,7 @@ h1, h2, h3, p { margin: 0; }
 .row-title { font-weight: 600; font-synthesis: none; font-size: clamp(21px, calc(21px + 9 * (100vw - 375px) / 985), 30px); line-height: 1.22; letter-spacing: -.012em; text-wrap: pretty; }
 .stretch::after { content: ''; position: absolute; inset: 0; }
 .stretch:hover { color: var(--ink); }
+.row-note { font-family: var(--text); font-size: 16px; line-height: 1.6; max-width: 720px; }
 .row-deck { font-family: var(--text); font-style: italic; font-size: 16px; line-height: 1.5; color: var(--mute); }
 .row-m { gap: 14px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; color: var(--mute); padding-top: 2px; white-space: nowrap; }
 .row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; font-family: var(--mono); font-size: 11px; color: var(--mute); white-space: nowrap; padding-top: 2px; pointer-events: none; }
@@ -245,6 +247,12 @@ h1, h2, h3, p { margin: 0; }
 .art-body .fig img { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: var(--hover); }
 .art-body .fig figcaption { margin-top: .6em; }
 .art-body p.lead { font-size: clamp(20px, calc(20px + 4 * (100vw - 375px) / 985), 24px); line-height: 1.7; }
+.intro { padding: 4px 0 4px 20px; border-left: 3px solid var(--red); display: flex; flex-direction: column; gap: 10px; }
+.intro p { font-family: var(--text); font-size: clamp(17px, calc(17px + 2 * (100vw - 375px) / 985), 19px); line-height: 1.75; text-wrap: pretty; }
+.prose { max-width: 720px; margin-top: 48px; font-family: var(--text); font-size: 18px; line-height: 1.8; }
+.prose h2 { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--red); margin: 36px 0 10px; }
+.prose ul { margin: 0; padding-left: 1.2em; }
+.prose a { border-bottom: 1px solid var(--red); }
 .credit { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .credit a { color: var(--ink); border-bottom: 1px solid var(--red); }
 .flow-foot { font-family: var(--serif-en); font-style: italic; font-size: 22px; color: var(--mute2); text-align: center; padding: 40px 20px 160px; }

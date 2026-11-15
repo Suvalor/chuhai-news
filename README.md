@@ -1,7 +1,7 @@
 ---
 title: chuhainews 使用说明
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-15
 tags: [python, fastapi, webhook, mcp, seo, geo]
 status: active
 ---
@@ -14,7 +14,7 @@ X 长文精选站：WebHook 推入文章 → SQLite → 服务端渲染的编辑
 
 ```bash
 uv sync                                  # 装依赖到项目内 .venv
-.venv/bin/python -m pytest -q            # 21 项测试
+.venv/bin/python -m pytest -q            # 22 项测试
 bash scripts/dev.sh                      # 本地预览 http://127.0.0.1:8090
 ```
 
@@ -27,6 +27,8 @@ bash scripts/dev.sh                      # 本地预览 http://127.0.0.1:8090
 | 变量 | 必填 | 说明 |
 |---|---|---|
 | `WEBHOOK_SECRET` | 是 | 没设置时 WebHook 一律 503 拒收 |
+| `CONTACT_EMAIL` | 线上建议 | 关于页公开的删除/更正联系邮箱；不设则关于页不显示联系方式 |
+| `INDEXNOW_KEY` | 线上建议 | IndexNow 密钥（8–128 位字母、数字或 `-`，`openssl rand -hex 16`）。设置且 `SITE_URL` 为 https 时才推送 |
 | `MCP_WRITE_TOKEN` | 否 | MCP 写入工具的独立令牌；不设则沿用 `WEBHOOK_SECRET`。分开设置后，泄露其一只需换其一 |
 | `ADMIN_PASSWORD` | 是 | 没设置时后台不可登录 |
 | `SECRET_KEY` | 建议 | 参与后台 Cookie 签名；更换后所有会话失效 |
@@ -90,12 +92,26 @@ docker compose up -d --build
 - `views` / `likes` / `saves`（可选，非负整数）填来源平台的浏览、赞、收藏（X 书签）数。前台显示的是「来源数 + 本站读者产生的数」；再推只替换来源数，本站增量保留，没带的字段不改。
 - 正文二选一：`paragraphs`（字符串或 `{text, translation}`），或 `body` + `body_translated`（按空行分段，第 N 段对应第 N 段）。
 - 段落可带 `type`：`paragraph`（默认）、`heading`（小标题）、`image`（配图，必须给 `src`，只收 https；`text` / `translation` 作图注，可省略）。例：`{"type": "heading", "text": "第一步：采集", "translation": "Step 1: Capture"}`、`{"type": "image", "src": "https://pbs.twimg.com/media/xxx?format=jpg&name=large"}`。用 `body` 时写 `## 小标题`、`![图注](https://图片)`，后台编辑框也用这套写法。
-- 没给 `summary` 时，描述自动取开头几段正文（跳过小标题和图）凑满 160 字。网址按译名生成时按词截断，不切半个单词。
+- `summary` 是**编者导读**：编辑部对这篇的判断，2～3 句（约 80～200 字），不写「本文介绍了」。它显示在阅读页正文前，写进 `.md`（`## 编者导读`）和 `llms.txt`（取第一句），同时作 SEO 描述。本站不自动生成导读。
+- 没给 `summary` 时不显示导读，描述自动取开头几段正文（跳过小标题和图）凑满 160 字。网址按译名生成时按词截断，不切半个单词。
 - `category` 必须是已有类目的 key（默认 `cog / money / ai / tool / global / create`）；写错或不存在会 422 拒收，并列出可用 key。新类目先在后台「类目」页新建。
 - `status` 为 `draft` 时只进后台，不对外。
 - 没有译文时前台不显示翻译开关。本站不做自动翻译，翻译在推送前完成。
 
 每次投递（成功或失败）都记在后台「WebHook」页。
+
+## 专题
+
+后台「专题」页新建（只填网址 key 和标题，新建即草稿），进编辑页填导语、文章，再改成「已发布」。文章一行一篇：`slug | 入选理由`，也可直接贴文章网址，入选理由可省略；顺序就是前台顺序，重复的行只算一次，写错的 slug 会拒绝保存。前台只展示已发布、且至少有一篇在架文章的专题；文章下架后自动从专题里消失。
+
+建议真实文章满 30 篇、一个专题能凑够 5～8 篇好文章时再发布专题，否则就是空壳页。
+
+## 只读 JSON
+
+给外部看板或信源聚合拉取（如「个人工作台 · 新闻与信源」），公开只读，范围与 RSS 相同：
+
+- `GET /api/articles?limit=50&category=money`：最新发布的文章，按发布时间倒序，最多 100 篇。每篇含 `url`、`source_url`（X 原帖）、`title`、`title_translated`、`summary`、`author`、`category`、`published_at`、`views/likes/saves`。
+- `GET /api/articles/{slug}`：同上字段加 `paragraphs`（`type` 为 `paragraph`/`heading`/`image`，带 `text`、`translation`，图片带 `src`）。
 
 ## MCP
 
@@ -107,6 +123,7 @@ Streamable HTTP 端点：`{SITE_URL}/mcp`（无状态，JSON 响应）。工具�
 | `latest_articles(category?, sort?, limit?)` | 最新 / 热度 / 阅读量排序 |
 | `get_article(slug)` | 全文，逐段原文 + 译文 |
 | `list_categories()` / `list_authors()` | 类目与作者 |
+| `list_topics()` | 已发布专题：导语、按编辑顺序排列的文章与每篇的入选理由 `note` |
 | `publish_articles(articles)` | 推送文章（新建或按 `external_id` 更新）。字段、限制、整批校验都与 WebHook 相同，参数定义就是 `$defs.article`。需要连接请求头带 `Authorization: Bearer <令牌>`（`MCP_WRITE_TOKEN`，未设则为 `WEBHOOK_SECRET`），不带只能读；每次推送记入后台「WebHook」页 |
 
 Claude Code 接入：
@@ -122,15 +139,26 @@ claude mcp add --transport http chuhainews https://你的域名/mcp --header "Au
 |---|---|
 | 服务端渲染 + 语义标签 | 每篇文章独立网址 `/a/<slug>`，正文直接在 HTML 里 |
 | title / description / canonical / Open Graph / Twitter Card | 每页单独生成；搜索、收藏页 `noindex,follow` |
-| JSON-LD | WebSite+SearchAction、Article（含作者、原帖 isBasedOn、阅读/赞计数）、BreadcrumbList、ProfilePage、CollectionPage |
+| JSON-LD | WebSite+SearchAction、Article（含作者、原帖 isBasedOn、阅读/赞计数）、BreadcrumbList、ProfilePage、CollectionPage（类目、专题）、AboutPage+Organization |
 | `/sitemap.xml`、`/feed.xml` | 站点地图与 RSS |
 | `/robots.txt` | 允许所有爬虫；显式列出 GPTBot、ClaudeBot、PerplexityBot 等 AI 爬虫 |
 | `/llms.txt`、`/llms-full.txt` | 给大模型的站点导航与全文合集 |
 | `/a/<slug>.md` | 每篇文章的 Markdown 版本，HTML 用 `rel=alternate type=text/markdown` 声明 |
+| 编者导读 | `summary` 显示在正文前并进 `.md`、`llms.txt`：本站相对原帖的原创增量 |
+| IndexNow | 文章或专题的公开状态变化时（发布、修改、下架、删除；一直是草稿的不推），后台线程通知 `api.indexnow.org`（Bing、Yandex、Naver 等，Google 不参与）；密钥文件在 `/<INDEXNOW_KEY>.txt`；失败只写日志 `chuhai.indexnow`，不影响发布 |
+| `/about` | 运营方、选文标准、翻译方式（AI 翻译，未逐篇校对）、版权与删除联系；`llms.txt` 开头指向它 |
+| `/t/<key>` 专题 | 编辑部策划的主题合集，带导语与每篇入选理由；进 sitemap、`llms.txt`、MCP |
+
+## 让搜索引擎收录（上线后做一次）
+
+1. 设置 `SITE_URL`（https）和 `INDEXNOW_KEY`，重启后确认 `https://你的域名/<INDEXNOW_KEY>.txt` 能打开、内容就是密钥。
+2. Google Search Console 验证域名，提交 `https://你的域名/sitemap.xml`。Google 不支持 IndexNow，也停用了 sitemap ping，之后靠它定期重读 sitemap。
+3. Bing Webmaster Tools 从 Search Console 导入站点。新文章由 IndexNow 推送；Bing 的索引也供 ChatGPT 搜索、Copilot、DuckDuckGo 等使用。
+4. AI 爬虫（GPTBot、ClaudeBot、PerplexityBot 等）没有提交接口，靠 `robots.txt` 放行、sitemap、`llms.txt` 和站内链接自己发现。
 
 ## 前台交互
 
-首页（按问题找 / 今日必读 / 作者 / 榜单）、类目、作者、搜索、收藏、阅读六种视图，中英界面切换（Cookie）。阅读页：← → 切换、T 翻译、L 赞、S 收藏、ESC 返回、/ 搜索；滚到底自动接下一篇（同作者优先，读完换同类目），网址与侧栏随当前文章更新。动效：进场揭示、首页旋转字环（rotation）、翻译模糊淡入、点赞弹跳；系统开启「减少动态效果」时全部停用。赞和收藏存在浏览器本地，同时累加到服务器计数；服务器按访客 IP 的摘要去重（不存原始 IP）：同一 IP 对同一篇赞、收藏各算一次，阅读每天算一次。
+首页（按问题找 / 今日必读 / 作者 / 专题 / 榜单；没有专题时不显示专题区）、类目、作者、专题、搜索、收藏、阅读、关于，中英界面切换（Cookie）。阅读页：← → 切换、T 翻译、L 赞、S 收藏、ESC 返回、/ 搜索；滚到底自动接下一篇（同作者优先，读完换同类目），网址与侧栏随当前文章更新。动效：进场揭示、首页旋转字环（rotation）、翻译模糊淡入、点赞弹跳；系统开启「减少动态效果」时全部停用。赞和收藏存在浏览器本地，同时累加到服务器计数；服务器按访客 IP 的摘要去重（不存原始 IP）：同一 IP 对同一篇赞、收藏各算一次，阅读每天算一次。
 
 ## 安全
 

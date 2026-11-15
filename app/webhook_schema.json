@@ -45,7 +45,7 @@
         "body_translated": {"type": "string", "maxLength": 200000, "description": "与 body 同样分段的译文，第 N 段对应第 N 段。"},
         "published_at": {"type": "string", "maxLength": 40, "description": "ISO 8601 时间，如 2026-11-05T14:52:29Z；缺省为入库时间。"},
         "status": {"enum": ["published", "draft"], "default": "published", "description": "draft 只进后台，不对外。"},
-        "summary": {"type": "string", "maxLength": 600, "description": "摘要，作 SEO 描述；缺省取开头正文。"},
+        "summary": {"type": "string", "maxLength": 600, "description": "编者导读：编者对本文的判断，2～3 句（约 80～200 字），不要写「本文介绍了」。显示在阅读页正文前，并写入 .md、llms.txt 和 SEO 描述；缺省不显示导读，SEO 描述取开头正文。"},
         "cover": {"type": "string", "maxLength": 2000, "pattern": "^https://\\S+$", "description": "封面图（https），用作分享卡片 og:image / twitter:image 和结构化数据 image。缺省时取正文第一张图。"},
         "slug": {"type": "string", "maxLength": 80, "description": "自定义网址；缺省由英文标题生成。"},
         "mins": {"type": "integer", "minimum": 1, "maximum": 599, "description": "阅读分钟数；缺省自动估算。"},
