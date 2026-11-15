@@ -23,6 +23,7 @@ from .mcp_tools import mcp
 
 HERE = Path(__file__).resolve().parent
 PAGE = 30
+EXCEL_RATIO_PATH = "/tools/excel-ratio-converter"
 CJK = re.compile(r"[一-鿿]")
 AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "anthropic-ai",
            "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot-Extended", "Bytespider", "CCBot",
@@ -263,6 +264,20 @@ def article_ctx(a, ui, base):
     return dict(a=a, bio=bio, rails=rails, nxt=nxt, url=f"{base}/a/{a['slug']}")
 
 
+@app.get(EXCEL_RATIO_PATH, response_class=HTMLResponse)
+def excel_ratio_converter(request: Request):
+    ui = ui_of(request)
+    t = T[ui]
+    base = site_url(request)
+    url = base + EXCEL_RATIO_PATH
+    ld = {"@context": "https://schema.org", "@type": "WebApplication", "name": t["excelRatio"],
+          "url": url, "description": t["excelDesc"], "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Any", "inLanguage": ["zh-CN", "en"], "isAccessibleForFree": True,
+          "offers": {"@type": "Offer", "price": "0"}}
+    return render(request, "index.html", view="excel-ratio", title=f"{t['excelRatio']} | chuhainews",
+                  description=t["excelDesc"], ld=[ld, crumbs_ld([("chuhainews", base + "/"), (t["excelRatio"], url)])])
+
+
 @app.get("/a/{slug}.md", response_class=PlainTextResponse)
 def article_md(request: Request, slug: str):
     a = db.get_article(slug)
@@ -376,7 +391,7 @@ def sitemap(request: Request):
     base = site_url(request)
     arts = db.list_articles(sort="new", limit=50000)
     urls = [(base + "/", arts[0]["updated_at"] if arts else None)]
-    urls += [(base + "/about", None)]
+    urls += [(base + "/about", None), (base + EXCEL_RATIO_PATH, None)]
     urls += [(f"{base}/t/{tp['key']}", tp["updated_at"]) for tp in topic_cards("zh")]
     urls += [(f"{base}/c/{c['key']}", None) for c in db.categories() if c["n"]]
     urls += [(f"{base}/u/{a['handle']}", None) for a in db.authors() if a["n"]]
@@ -476,6 +491,8 @@ def llms(request: Request):
            "每篇文章都有 Markdown 版本：在文章网址后加 `.md`。全文合集见 llms-full.txt。",
            f"运营方、选文标准、翻译方式（AI 翻译，未逐篇校对）与版权联系：{base}/about",
            f"Agent 可通过 MCP（Streamable HTTP）查询：{base}/mcp", ""]
+    out += ["## 实用工具 / Tools", "",
+            f"- [{T['zh']['excelRatio']} / {T['en']['excelRatio']}]({base + EXCEL_RATIO_PATH}): {T['zh']['excelDesc']}", ""]
     tps = topic_cards("zh")
     if tps:
         out += ["## 专题 / Topics", ""]
