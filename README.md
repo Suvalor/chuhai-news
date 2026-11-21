@@ -1,7 +1,7 @@
 ---
 title: chuhainews 使用说明
 created: 2026-11-12
-updated: 2026-11-15
+updated: 2026-11-16
 tags: [python, fastapi, webhook, mcp, seo, geo]
 status: active
 ---
@@ -14,7 +14,7 @@ X 长文精选站：WebHook 推入文章 → SQLite → 服务端渲染的编辑
 
 ```bash
 uv sync                                  # 装依赖到项目内 .venv
-.venv/bin/python -m pytest -q            # 22 项测试
+.venv/bin/python -m pytest -q            # 全部测试
 bash scripts/dev.sh                      # 本地预览 http://127.0.0.1:8090
 ```
 
@@ -60,6 +60,8 @@ docker compose up -d --build
 
 ## WebHook 协议
 
+选文核验、推送和更新已有文章的操作注意事项见 [文章推送规则](docs/20261116-webhook-publishing-guidelines.md)。
+
 `POST /api/webhook`。完整参数定义（JSON Schema，含认证方式、字段、限制和示例）：`GET /api/webhook`，源文件 `app/webhook_schema.json`。让 LLM 推送时，把这个地址或文件交给它即可；也可以直接把 `$defs.article` 当作函数调用的参数定义。出错时 400/422 响应会带 `docs` 字段指回这里。
 
 二选一认证：
@@ -92,13 +94,43 @@ docker compose up -d --build
 - `views` / `likes` / `saves`（可选，非负整数）填来源平台的浏览、赞、收藏（X 书签）数。前台显示的是「来源数 + 本站读者产生的数」；再推只替换来源数，本站增量保留，没带的字段不改。
 - 正文二选一：`paragraphs`（字符串或 `{text, translation}`），或 `body` + `body_translated`（按空行分段，第 N 段对应第 N 段）。
 - 段落可带 `type`：`paragraph`（默认）、`heading`（小标题）、`image`（配图，必须给 `src`，只收 https；`text` / `translation` 作图注，可省略）。例：`{"type": "heading", "text": "第一步：采集", "translation": "Step 1: Capture"}`、`{"type": "image", "src": "https://pbs.twimg.com/media/xxx?format=jpg&name=large"}`。用 `body` 时写 `## 小标题`、`![图注](https://图片)`，后台编辑框也用这套写法。
-- `summary` 是**编者导读**：编辑部对这篇的判断，2～3 句（约 80～200 字），不写「本文介绍了」。它显示在阅读页正文前，写进 `.md`（`## 编者导读`）和 `llms.txt`（取第一句），同时作 SEO 描述。本站不自动生成导读。
+- `summary` 是**编者导读**：编辑部对这篇的判断，2～3 句（约 80～200 字），不写「本文介绍了」。它显示在阅读页正文前，写进 `.md`（`## 编者导读`）和 `llms.txt`（取第一句），同时作 SEO 描述。整篇推送时本站不自动生成导读。
 - 没给 `summary` 时不显示导读，描述自动取开头几段正文（跳过小标题和图）凑满 160 字。网址按译名生成时按词截断，不切半个单词。
 - `category` 必须是已有类目的 key（默认 `cog / money / ai / tool / global / create`）；写错或不存在会 422 拒收，并列出可用 key。新类目先在后台「类目」页新建。
 - `status` 为 `draft` 时只进后台，不对外。
-- 没有译文时前台不显示翻译开关。本站不做自动翻译，翻译在推送前完成。
+- 没有译文时前台不显示翻译开关。整篇推送时本站不翻译，翻译在推送前完成；只推链接时由站点调用 DeepSeek 翻译（见下一节）。
 
 每次投递（成功或失败）都记在后台「WebHook」页。
+
+### 只推链接，站点自动导入
+
+同一个 `POST /api/webhook`、同样的认证，请求体写成 `{"links": [...]}`（1–100 条）：
+
+```json
+{"links": ["https://x.com/builder/status/2120385360677204173 | tool | 入选理由", {"url": "https://x.com/a/status/123", "category": "ai"}]}
+```
+
+- 立刻返回 `202 {"ok": true, "queued": N}`，站点在后台逐篇处理，**直接发布**，每篇的结果写进后台「WebHook」页。
+- 取原文和浏览／点赞／收藏数用 fxtwitter；DeepSeek 只负责翻译、写导读初稿、判类目（链接里没写类目或写错时）。DeepSeek 自己打不开链接。
+- 原文少于 1500 字符的跳过；同一原帖站上已有译文的，只更新三个数字，不再翻译、不花 token。
+- 服务器 `.env` 要有 `DEEPSEEK_API_KEY`（可选 `DEEPSEEK_MODEL`），否则返回 503。
+- 队列在进程内存里，容器重启会丢掉没跑完的链接；看日志缺哪篇，重推那几条即可。
+
+### 从 X 链接导入（本地脚本）
+
+`scripts/import_x.py` 在本机跑，用来把一批 X 链接变成 WebHook 载荷。它先生成 JSON、人工核对后再推，适合要审稿的批次；全自动用上面的 `links`。给 LLM / Agent 的完整调用规范（报告状态码、什么时候可以推送）见 [scripts/README.md](scripts/README.md)。
+
+```bash
+.venv/bin/python scripts/import_x.py links.txt                   # 只生成 data/import/<时间>.json 并打印报告，不推送
+.venv/bin/python scripts/import_x.py --push data/import/<时间>.json  # 核对后推送
+```
+
+- **链接文件**：一行一篇，写 `x.com/<用户>/status/<ID>` 或本站 `/a/<slug>`。同一行可以用 `|` 或 Tab 带上类目 key，Grok 给出的表格可以直接贴进来。
+- **取原文**：用 fxtwitter 公开接口（`api.fxtwitter.com`），免费、不用登录。X Article 的小标题、列表、配图和浏览／点赞／收藏数都能拿到。这个接口不是官方的，失效时要改用 X API。
+- **翻译**：设了 `DEEPSEEK_API_KEY`（可选 `DEEPSEEK_MODEL`，默认 `deepseek-flash`）才会翻译，DeepSeek 只返回译文。新文章还会多一次调用，生成导读初稿。不设 key 时译文留空。
+- **长度门槛**：原文少于 `--min-chars`（默认 1500）字符的跳过。
+- **站上已有的文章**（按原帖 ID 匹配最新 100 篇）：保留原网址、导读和发布状态。external_id 必须和旧的一致，否则会新建一篇重复文章：用 `--existing-prefix` 给出前缀，脚本会拿线上网址核对；前缀没确认的文章不翻译，也不写进 JSON。新文章用 `x:<ID>`，以草稿入库。
+- **推送**：只推送 external_id、类目、译文都齐全的文章，读 `.env` 里的 `SITE_URL` 和 `WEBHOOK_SECRET`。
 
 ## 专题
 
@@ -176,6 +208,6 @@ app/mcp_tools.py   MCP 工具
 app/admin.py       管理后台
 app/templates/     Jinja2 模板（admin/ 为后台）
 app/static/        site.css / site.js / admin.css
-scripts/           dev.sh 本地预览，seed_demo.py 演示数据
+scripts/           dev.sh 本地预览，seed_demo.py 演示数据，import_x.py 从 X 链接导入
 tests/             pytest
 ```
