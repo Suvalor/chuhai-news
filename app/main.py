@@ -14,8 +14,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.background import BackgroundTask
 
-from . import db, indexnow, limits
+from . import db, importer, indexnow, limits
 from .i18n import HOT_QUERIES, T, count, fmt
 from .ingest import SCHEMA as WEBHOOK_SCHEMA, BatchError, publish
 from .limits import client_ip
@@ -146,7 +147,7 @@ def home(request: Request):
         top = db.list_articles(cat=c["key"], limit=1)
         c["top"] = top[0]["title"] if top else ""
     featured = deco(db.list_articles(limit=1), ui)
-    authors = db.authors()
+    authors = [a for a in db.authors() if a["n"]]  # 0 篇的作者页是空的，首页不列也不计数
     topics = topic_cards(ui)
     lst = listing(request, ui)
     total = sum(c["n"] for c in cats)
@@ -571,6 +572,18 @@ async def webhook(request: Request):
     except ValueError:
         db.log_webhook(False, 400, "不是合法 JSON")
         return JSONResponse({"error": "invalid JSON", "docs": "GET /api/webhook"}, 400)
+    if isinstance(data, dict) and "links" in data:  # 只给链接：后台取文、翻译、直接发布，结果看后台 WebHook 日志
+        if not os.getenv("DEEPSEEK_API_KEY"):
+            db.log_webhook(False, 503, "Import：DEEPSEEK_API_KEY 未配置，链接导入拒收")
+            return JSONResponse({"error": "link import disabled: DEEPSEEK_API_KEY not set"}, 503)
+        try:
+            links = importer.parse_links(data["links"])
+        except ValueError as e:
+            db.log_webhook(False, 400, f"Import：{e}")
+            return JSONResponse({"error": str(e), "docs": "GET /api/webhook"}, 400)
+        db.log_webhook(True, 202, f"Import：收到 {len(links)} 条链接，后台处理中", [f"x:{x}" for _, x, _ in links])
+        return JSONResponse({"ok": True, "queued": len(links)}, 202,
+                            background=BackgroundTask(importer.run, links, site_url(request)))
     items = data["articles"] if isinstance(data, dict) and "articles" in data else data if isinstance(data, list) else [data]
     try:
         results = publish(items, site_url(request))

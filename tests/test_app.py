@@ -463,3 +463,41 @@ def test_indexnow(c, monkeypatch):
     monkeypatch.setenv("SITE_URL", "http://127.0.0.1:8090")
     n = len(sent)
     assert indexnow.notify(["http://127.0.0.1:8090/a/x"]) is False and len(sent) == n
+
+
+def test_webhook_links_import(c, monkeypatch):
+    from app import importer
+    auth = {"Authorization": "Bearer s3cret"}
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    assert c.post("/api/webhook", json={"links": ["https://x.com/a/status/1"]}, headers=auth).status_code == 503
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "k")
+    assert c.post("/api/webhook", json={"links": ["https://example.com/x"]}, headers=auth).status_code == 400
+
+    long_text = "\n\n".join(f"Paragraph {i}. " + "word " * 60 for i in range(6))
+    tweets = {"900": {"text": long_text, "lang": "en", "is_note_tweet": True, "created_timestamp": 1763000000,
+                      "author": {"screen_name": "builder", "name": "Builder"}, "views": 5000, "likes": 40, "bookmarks": 9},
+              "901": {"text": "too short", "lang": "en", "created_timestamp": 1763000000,
+                      "author": {"screen_name": "builder"}, "views": 1, "likes": 1, "bookmarks": 1}}
+    monkeypatch.setattr(importer, "http_json", lambda url, *a, **k: {"tweet": tweets[url.rsplit("/", 1)[1]]})
+    calls = []
+    monkeypatch.setattr(importer, "translate", lambda texts, to: calls.append(len(texts)) or [f"译{i}" for i in range(len(texts))])
+    monkeypatch.setattr(importer, "deepseek", lambda system, p: {"summary": "导读初稿", "category": "ai"})
+
+    r = c.post("/api/webhook", headers=auth, json={"links": [
+        "https://x.com/builder/status/900 | 不是类目 | 理由", {"url": "https://x.com/builder/status/901"}]})
+    assert r.status_code == 202 and r.json()["queued"] == 2
+    a = c.get("/api/articles/" + db_slug("x:900")).json()  # 没给类目：DeepSeek 判为 ai，直接发布
+    assert a["category"] == "ai" and a["views"] == 5000 and a["title_translated"] == "译0"
+    assert db_slug("x:901") is None  # 短帖跳过
+    assert calls == [7]
+
+    tweets["900"]["views"] = 6000  # 再推一次：已有译文，只更新数据，不再翻译
+    c.post("/api/webhook", headers=auth, json={"links": ["https://x.com/builder/status/900"]})
+    assert calls == [7] and c.get("/api/articles/" + db_slug("x:900")).json()["views"] == 6000
+
+
+def db_slug(external_id):
+    from app import db
+    with db.connect() as con:
+        r = con.execute("SELECT slug FROM articles WHERE external_id=?", (external_id,)).fetchone()
+    return r[0] if r else None
