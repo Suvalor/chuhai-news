@@ -30,7 +30,7 @@
           "required": ["handle"]
         },
         "paragraphs": {
-          "type": "array", "maxItems": 400, "minItems": 1,
+          "type": "array", "maxItems": 1000, "minItems": 1,
           "description": "按顺序的段落。纯字符串 = 无译文正文段。",
           "items": {"oneOf": [
             {"type": "string", "minLength": 1, "maxLength": 20000},
