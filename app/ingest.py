@@ -11,7 +11,7 @@ from . import db, indexnow
 SCHEMA = json.loads((Path(__file__).parent / "webhook_schema.json").read_text())
 
 LANGS = ("en", "zh")
-MAX_PARAS = 400
+MAX_PARAS = 1000  # 长 X Article 会切出 400+ 段（2026-11-21 实测 468 段）
 MAX_TEXT = 20000
 
 
