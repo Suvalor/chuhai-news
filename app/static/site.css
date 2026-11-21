@@ -121,11 +121,9 @@ h1, h2, h3, p { margin: 0; }
 .btn-ink.wide { justify-content: space-between; padding: 0 18px; font-size: 13px; }
 
 /* 03 作者 */
-.au-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); border-left: 1px solid var(--line); }
-@media (max-width: 759px) { .au-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.au-cell { display: flex; flex-direction: column; gap: 14px; padding: 22px 20px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transition: background .28s; }
-.au-cell:hover { background: var(--hover); color: var(--ink); }
-.au-n { font-weight: 600; font-synthesis: none; font-size: 24px; line-height: 1.1; }
+/* 首页作者：复用搜索页的作者胶囊；手机上一行横滑，不占几屏 */
+.home-au { padding-top: 24px; }
+@media (max-width: 759px) { .s-authors.home-au { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--pad)); padding: 20px var(--pad) 4px; } .home-au .s-au { flex-shrink: 0; white-space: nowrap; } }
 
 /* 分类 / 作者 / 收藏 页头 */
 .chips { display: flex; gap: 24px; flex-wrap: wrap; padding-bottom: 28px; }

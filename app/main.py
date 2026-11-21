@@ -147,7 +147,7 @@ def home(request: Request):
         top = db.list_articles(cat=c["key"], limit=1)
         c["top"] = top[0]["title"] if top else ""
     featured = deco(db.list_articles(limit=1), ui)
-    authors = db.authors()
+    authors = [a for a in db.authors() if a["n"]]  # 0 篇的作者页是空的，首页不列也不计数
     topics = topic_cards(ui)
     lst = listing(request, ui)
     total = sum(c["n"] for c in cats)

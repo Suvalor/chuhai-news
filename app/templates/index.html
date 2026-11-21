@@ -55,10 +55,8 @@
 {% if authors %}
 <section class="wrap sec">
 <div class="sec-hd" data-rv><h2 class="mono xs up">03 — {{ t.authorsLabel }}</h2><span class="hint">{{ t.authorsHint }}</span></div>
-<div class="au-grid">
-{% for a in authors %}
-<a href="/u/{{ a.handle }}" class="au-cell" data-rv><span class="avatar" aria-hidden="true">{{ a.name[:1] | upper }}</span><span class="au-n f-{{ font(a.name) }}">{{ a.name }}</span><span class="mono xs mute">@{{ a.handle }} · {{ count(a.n) }}</span></a>
-{% endfor %}
+<div class="s-authors home-au" data-rv>
+{% for a in authors %}<a href="/u/{{ a.handle }}" class="s-au"><span class="avatar sm" aria-hidden="true">{{ a.name[:1] | upper }}</span><b>{{ a.name }}</b><span class="mono xs">{{ count(a.n) }}</span></a>{% endfor %}
 </div>
 </section>
 {% endif %}
