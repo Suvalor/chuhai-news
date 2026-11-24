@@ -4,7 +4,7 @@
   font: inherit;
 }
 
-.excel-tool { padding-top: 40px; padding-bottom: 48px; }
+.excel-tool { padding-top: var(--sp-5); padding-bottom: var(--sp-8); }
 
 .excel-tool .page-header {
   display: flex;
@@ -16,14 +16,17 @@
 
 .excel-tool h1 {
   margin: 0;
-  font-size: clamp(26px, 3vw, 38px);
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  line-height: 1.3;
+  font-family: var(--serif-zh);
   letter-spacing: -0.03em;
 }
 
 .excel-tool .header-note {
   margin: 8px 0 0;
-  color: #64748b;
-  font-size: 14px;
+  color: var(--mute);
+  font-size: var(--fs-md);
 }
 
 .excel-tool .workspace {
@@ -36,10 +39,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--hover);
   border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+  border-radius: var(--r-sm);
 }
 
 .excel-tool .source-panel {
@@ -72,8 +74,8 @@
 
 .excel-tool .list-column-title {
   margin: 0;
-  color: #475569;
-  font-size: 13px;
+  color: var(--mute);
+  font-size: var(--fs-sm);
   font-weight: 700;
 }
 
@@ -93,20 +95,20 @@
 
 .excel-tool .panel-title {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--fs-lg);
 }
 
 .excel-tool .panel-meta {
   color: var(--mute);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
 }
 
-.excel-tool .panel-.section-label {
+.excel-tool .section-label {
   display: block;
   margin-bottom: 10px;
-  color: #475569;
-  font-size: 13px;
+  color: var(--mute);
+  font-size: var(--fs-sm);
   font-weight: 700;
 }
 
@@ -116,10 +118,10 @@
   min-height: 260px;
   padding: 14px;
   resize: vertical;
-  color: #0f172a;
-  background: #f8fafc;
+  color: var(--ink);
+  background: var(--paper);
   border: 1px solid var(--track);
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   line-height: 1.6;
   tab-size: 4;
 }
@@ -131,8 +133,8 @@
 
 .excel-tool .hint {
   margin: 9px 0 18px;
-  color: #64748b;
-  font-size: 12px;
+  color: var(--mute);
+  font-size: var(--fs-sm);
   line-height: 1.55;
 }
 
@@ -141,15 +143,15 @@
   max-width: 100%;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: white;
+  border-radius: var(--r-sm);
+  background: var(--hover);
 }
 
 .excel-tool table {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -187,8 +189,8 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  color: #475569;
-  background: #f1f5f9;
+  color: var(--mute);
+  background: var(--paper-2);
   font-weight: 700;
 }
 
@@ -211,8 +213,8 @@
   max-width: 100%;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: white;
+  border-radius: var(--r-sm);
+  background: var(--hover);
 }
 
 .excel-tool .formula-cell {
@@ -241,7 +243,7 @@
 .excel-tool .member-name {
   max-width: 90px;
   overflow: hidden;
-  color: #0f172a;
+  color: var(--ink);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -254,8 +256,8 @@
   color: var(--ink);
   background: var(--paper);
   border: 1px solid var(--track);
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -266,7 +268,7 @@
 
 .excel-tool .formula-total {
   color: #16a34a;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -275,14 +277,14 @@
 .excel-tool .secondary-button {
   width: 100%;
   height: 44px;
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   border: 0;
   cursor: pointer;
   font-weight: 700;
 }
 
 .excel-tool .primary-button {
-  color: white;
+  color: var(--paper);
   background: var(--ink);
 }
 
@@ -296,7 +298,7 @@
 }
 
 .excel-tool .secondary-button {
-  color: #334155;
+  color: var(--ink);
   background: var(--line);
 }
 
@@ -313,23 +315,23 @@
 
 .excel-tool .summary-item {
   padding: 12px;
-  background: #f8fafc;
+  background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-sm);
 }
 
 .excel-tool .summary-value {
   display: block;
-  color: #0f172a;
-  font-size: 20px;
+  color: var(--ink);
+  font-size: var(--fs-xl);
   font-weight: 750;
 }
 
 .excel-tool .summary-name {
   display: block;
   margin-top: 2px;
-  color: #64748b;
-  font-size: 11px;
+  color: var(--mute);
+  font-size: var(--fs-xs);
 }
 
 .excel-tool .empty-state {
@@ -338,9 +340,9 @@
   place-items: center;
   padding: 30px;
   color: var(--mute);
-  background: #f8fafc;
+  background: var(--paper);
   border: 1px dashed var(--track);
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   text-align: center;
   line-height: 1.6;
 }
@@ -368,6 +370,8 @@
 }
 
 .excel-tool .guide { max-width: 760px; margin-top: 36px; line-height: 1.7; }
-.excel-tool .guide h2 { margin-top: 20px; font-size: 21px; }
+.excel-tool .guide h2 { margin-top: 20px; font-size: var(--fs-xl); }
 .excel-tool .guide p { margin-top: 6px; }
 .excel-tool #copyButton { margin-top: 16px; }
+
+@media (max-width: 759px) { .excel-tool h1 { font-size: var(--fs-xl); } }

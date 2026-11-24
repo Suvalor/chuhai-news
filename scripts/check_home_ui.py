@@ -27,12 +27,16 @@ now = datetime.now(timezone.utc)
 for i, a in enumerate(json.load(sys.stdin)):
     slug, _ = db.upsert_article({
         **a, 'external_id': 'preview:' + a['slug'], 'cat': a['category'],
-        'title_t': a['title_translated'], 'paras': [[a['summary'] or a['title'], '']],
+        'title_t': a['title_translated'], 'paras': [[a['title'], a['title_translated'] or ''], [a['summary'] or a['title'], '']],
         'mins': 10,
     })
     with db.connect() as con:
         con.execute('UPDATE articles SET created_at=? WHERE slug=?',
                     ((now - timedelta(hours=i * 5)).isoformat(), slug))
+first = db.list_articles(sort='collected', limit=1)[0]['slug']
+for key in ('ui-check', 'weekly-2026-w48', 'monthly-2026-11'):
+    db.create_topic(key, 'Local acceptance fixture')
+    db.save_topic(key, 'Local acceptance fixture', 'Fixture introduction', [[first, 'Fixture editorial note']], 'published', 0)
 """
 
 
@@ -102,7 +106,7 @@ def main():
                 save.click()
                 assert save.get_attribute("aria-pressed") == "true"
                 page.goto(url + "/saved", wait_until="networkidle")
-                page.locator(f'.row[data-slug="{slug}"]').wait_for()
+                page.locator(f'.card[data-slug="{slug}"]').wait_for()
                 page.goto(url, wait_until="networkidle")
                 page.locator(f'.card[data-slug="{slug}"] .stretch').click()
                 page.wait_for_url(f"**/a/{slug}")
@@ -129,6 +133,44 @@ def main():
                 assert mobile["width"] == mobile["viewport"] == 375
                 assert mobile["chipScroll"] > mobile["chipWidth"] and mobile["chipWrap"] == "nowrap"
                 page.screenshot(path="/tmp/chuhai-home-mobile.png")
+                # Cross-page acceptance: identical header and article-card tokens.
+                sample = payload[0]
+                routes = ["/", "/c/" + sample["category"], "/u/" + sample["author"]["handle"],
+                          "/search?q=" + sample["title"][:20], "/saved", "/rank", "/about",
+                          "/tools/excel-ratio-converter", "/t/ui-check",
+                          "/weekly/2026-w48", "/monthly/2026-11"]
+                from urllib.parse import quote
+                for width in (375, 768, 1512):
+                    page.set_viewport_size({"width": width, "height": 812})
+                    page.goto(url, wait_until="networkidle")
+                    baseline = page.locator(".logo-w").evaluate("e => getComputedStyle(e).fontSize")
+                    card_size = page.locator(".home-feed .card-title").first.evaluate("e => getComputedStyle(e).fontSize")
+                    for route in routes:
+                        page.goto(url + quote(route, safe="/?=&"), wait_until="networkidle")
+                        assert page.locator(".home-nav").count() == 1, route
+                        assert page.locator(".logo-w").evaluate("e => getComputedStyle(e).fontSize") == baseline, route
+                        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (width, route)
+                        if route.startswith(("/c/", "/u/", "/search", "/saved", "/t/", "/weekly/", "/monthly/")):
+                            page.locator(".card-title").first.wait_for()
+                            assert page.locator(".card-title").first.evaluate("e => getComputedStyle(e).fontSize") == card_size, route
+                        if route == "/saved":
+                            page.locator('[data-saved-tab="liked"]').click()
+                            page.locator(".card-title").first.wait_for()
+                            assert page.locator('[data-saved-tab="liked"]').get_attribute("aria-selected") == "true"
+                            page.locator('[data-saved-tab="saved"]').click()
+                            page.locator(".card-title").first.wait_for()
+                        print("shared UI:", width, route, flush=True)
+                    page.goto(url + "/a/" + slug, wait_until="networkidle")
+                    assert page.locator(".art-h").count() >= 1
+                    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (width, "reader")
+                    switch = page.locator(".trans-btn")
+                    if switch.is_visible():
+                        state = switch.get_attribute("aria-pressed")
+                        switch.click()
+                        assert switch.get_attribute("aria-pressed") != state
+                        switch.click()
+                        assert switch.get_attribute("aria-pressed") == state
+                    print("reader UI:", width, flush=True)
                 assert not errors, errors
                 browser.close()
             print(f"PASS: {len(payload)} live article records, desktop/mobile layout and interactions")
