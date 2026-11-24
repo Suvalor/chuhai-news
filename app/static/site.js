@@ -8,7 +8,7 @@
 
   // ---------- 本地状态（与设计稿同一个 key） ----------
   const KEY = 'chuhai.v3';
-  const load = () => { try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); return { liked: s.liked || {}, saved: s.saved || {} }; } catch (e) { return { liked: {}, saved: {} }; } };
+  const load = () => { try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); return { liked: s.liked || {}, saved: s.saved || {}, read: s.read || {}, unreadOnly: !!s.unreadOnly }; } catch (e) { return { liked: {}, saved: {}, read: {}, unreadOnly: false }; } };
   const store = load();
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} };
   const ids = f => Object.keys(store[f]).filter(k => store[f][k]);
@@ -82,6 +82,7 @@
     paintRail();
     paintMarks();
     if (location.pathname !== '/a/' + slug) { history.replaceState(null, '', '/a/' + slug); document.title = art.dataset.title; }
+    store.read[slug] = true; persist();
     if (!sessionStorage.getItem('v:' + slug)) { sessionStorage.setItem('v:' + slug, '1'); post(slug, 'view'); }
   }
 
@@ -176,6 +177,44 @@
   }
   const closeSheet = () => { const w = $('[data-sheet]'); if (w) w.hidden = true; };
 
+  // ---------- 首页未读筛选 ----------
+  function initHome() {
+    const control = $('[data-unread-control]'), filter = $('[data-unread-only]');
+    const empty = $('[data-unread-empty]'), cards = $$('.home-feed .card');
+    const apply = () => {
+      let visibleCount = 0;
+      for (const card of cards) {
+        const read = !!store.read[card.dataset.slug];
+        card.classList.toggle('is-read', read);
+        card.hidden = filter.checked && read;
+        if (!card.hidden) visibleCount++;
+      }
+      for (const day of $$('[data-feed-day]')) {
+        const n = $$('.card:not([hidden])', day).length;
+        day.hidden = n === 0;
+        const count = $('[data-day-count]', day);
+        count.textContent = body.dataset.ui === 'zh' ? n + ' 篇' : n + (n === 1 ? ' piece' : ' pieces');
+      }
+      empty.hidden = !filter.checked || !cards.length || visibleCount > 0;
+    };
+    filter.checked = store.unreadOnly;
+    control.hidden = false;
+    filter.addEventListener('change', () => {
+      store.unreadOnly = filter.checked;
+      persist(); apply();
+    });
+    addEventListener('pageshow', () => {
+      const latest = load();
+      store.read = latest.read;
+      store.saved = latest.saved;
+      store.liked = latest.liked;
+      store.unreadOnly = latest.unreadOnly;
+      filter.checked = latest.unreadOnly;
+      paintMarks(); apply();
+    });
+    apply();
+  }
+
   // ---------- 收藏页 ----------
   async function initSaved() {
     const rows = $('[data-rows]'), empty = $('[data-empty]');
@@ -201,7 +240,7 @@
     if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key.toLowerCase();
     if (body.dataset.view !== 'read') {
-      if (k === '/' && body.dataset.view !== 'search') { e.preventDefault(); location.href = '/search'; }
+      if (k === '/' && body.dataset.view !== 'search') { e.preventDefault(); const homeSearch = $('#home-q'); if (homeSearch) homeSearch.focus(); else location.href = '/search'; }
       return;
     }
     const art = currentArt();
@@ -217,4 +256,5 @@
   reveal();
   if (body.dataset.view === 'read') initRead();
   if (body.dataset.view === 'saved') initSaved();
+  if (body.dataset.view === 'home') initHome();
 })();

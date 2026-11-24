@@ -400,7 +400,9 @@ def test_topics_admin_and_public(c):
     page = c.get("/t/pricing-101").text
     assert page.index("Pricing Is Positioning") < page.index("Notes on Taste") and "先读这篇：定价就是定位" in page
     assert page.count('class="row"') == 2 and '"@type": "CollectionPage"' in page and 'class="sorts"' not in page
-    assert 'href="/t/pricing-101"' in c.get("/").text and "05 — " in c.get("/").text
+    home = c.get("/").text
+    assert 'href="/t/pricing-101"' in home
+    assert home.index('class="wrap home-section home-feed"') < home.index('class="idx idx-topic"')
     assert "[定价入门](https://chuhai.test/t/pricing-101): 2 篇 — 给第一次定价的人。" in c.get("/llms.txt").text
     locs = [e.text for e in ET.fromstring(c.get("/sitemap.xml").content).iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")]
     assert "https://chuhai.test/t/pricing-101" in locs

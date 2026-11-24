@@ -7,54 +7,53 @@
 <div class="sp"></div>
 <span class="mono xs mute2 desk-only">{{ today }}</span>
 {{ m.uipills(ui, path) }}
-</div></header>
+</div>
+{% if view == 'home' %}
+<div class="wrap home-nav">
+<nav class="home-cats" aria-label="{{ t.indexLabel }}">
+<a href="/" class="home-chip on" aria-current="page">{{ t.allCats }}</a>
+{% for c in cats %}<a href="/c/{{ c.key }}" class="home-chip">{{ c.zh if ui == 'zh' else c.en }}</a>{% endfor %}
+</nav>
+<form class="home-search" role="search" action="/search" method="get">
+<label class="sr" for="home-q">{{ t.search }}</label><input type="search" id="home-q" name="q" placeholder="{{ t.searchPh }}"><button type="submit" aria-label="{{ t.search }}">⌕</button>
+</form>
+</div>
+{% endif %}
+</header>
 
 <main id="main">
 {% if view == 'home' %}
-<section class="wrap mast">
-<div class="kick-row mono xs up" data-rv><span>{{ t.mastKicker }}</span><span>{{ count(total) }} · {{ authors | length }}{{ ' ' if ui == 'en' }}{{ t.authorsUnit }} · {{ today }}</span></div>
-<div class="mast-grid">
-<h1 class="mast-h {{ 'f-zh' if ui == 'zh' else 'f-en' }}" data-rv>{{ t.mh1 }}<br>{{ t.mh2a }}<span class="red">{{ t.mh2b }}</span>{{ t.mh2c }}</h1>
-<a href="#rank" class="ring desk-only" aria-label="{{ t.rankLabel }}">
-<svg viewBox="0 0 200 200" aria-hidden="true"><defs><path id="ringp" d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0"/></defs>
-<g class="ring-spin"><text><textPath href="#ringp" textLength="488">{{ t.ring }}</textPath></text></g></svg>
-<span class="ring-c">↓</span>
-</a>
-</div>
+<section class="wrap home-mast">
+<h1 class="{{ 'f-zh' if ui == 'zh' else 'f-en' }}">{{ t.mh1 }} {{ t.mh2a }}<span class="red">{{ t.mh2b }}</span>{{ t.mh2c }}</h1>
+<span class="mono">{{ count(total) }} · {{ authors | length }}{{ ' ' if ui == 'en' }}{{ t.authorsUnit }}</span>
 </section>
 
-<section class="wrap sec">
-<div class="sec-hd" data-rv><h2 class="mono xs up">01 — {{ t.indexLabel }}</h2><span class="hint">{{ t.indexHint }}</span></div>
-{% for c in cats %}
-<a href="/c/{{ c.key }}" class="idx" data-rv>
-<span class="mono sm dim">{{ '%02d' % loop.index }}</span>
-<span class="idx-name"><b class="{{ 'f-zh' if ui == 'zh' else 'f-' ~ font(c.en) }}">{{ c.zh if ui == 'zh' else c.en }}</b>{% if c.en != c.zh %}<i>{{ c.en if ui == 'zh' else c.zh }}</i>{% endif %}</span>
-<span class="idx-mid desk-only"><span>{{ c.tag_zh if ui == 'zh' else c.tag_en }}</span>{% if c.top %}<span class="idx-top f-{{ font(c.top) }}">↳ {{ c.top }}</span>{% endif %}</span>
-<span class="mono sm idx-n">{{ count(c.n) }}</span>
-<span class="idx-arrow" aria-hidden="true">→</span>
-<span class="idx-tag mob-only">{{ c.tag_zh if ui == 'zh' else c.tag_en }}</span>
+<section class="wrap home-section hot5" aria-labelledby="hot-heading">
+<div class="home-section-head"><h2 id="hot-heading"><span class="red" aria-hidden="true">●</span> {{ t.hotToday }}</h2><a href="/rank">{{ t.fullRank }} →</a></div>
+{% for it in hot5 %}
+<a class="hot5-row" href="/a/{{ it.slug }}">
+<span class="rank{{ ' hot' if loop.index <= 3 }}">{{ loop.index }}</span>
+<span class="hot5-title f-{{ it.ft if it.title_t and ui == 'zh' else it.f }}">{{ it.title_t if it.title_t and ui == 'zh' else it.title }}</span>
+<span class="hot5-meta"><span>{{ it.author_name }}</span><span>{{ t.read }} {{ it.views_f }}</span><span>{{ t.heatLabel }} {{ it.heat }}</span></span>
 </a>
-{% endfor %}
+{% else %}<p class="home-empty">{{ t.hotEmpty }}</p>{% endfor %}
 </section>
 
-{% if featured %}{% set f = featured %}
-<section class="wrap sec">
-<div class="sec-hd" data-rv><h2 class="mono xs up">02 — {{ t.mustLabel }}</h2><time class="mono xs mute" datetime="{{ f.published_at }}">{{ f.date_label }}</time></div>
-<a href="/a/{{ f.slug }}" class="feat" data-rv>
-<span class="feat-no desk-only" aria-hidden="true">01</span>
-<span class="feat-body">
-<span class="mono xs up mute">{{ f.cat_name }} — {{ f.mins }} {{ t.min }} — {{ f.lang_label }}</span>
-<span class="feat-t f-{{ f.f }}">{{ f.title }}</span>
-{% if f.title_t %}<span class="feat-d">{{ f.title_t }}</span>{% endif %}
-<span class="feat-by"><span class="avatar solid" aria-hidden="true">{{ f.author_name[:1] | upper }}</span><b>{{ f.author_name }}</b><span class="mono sm mute">{{ t.read }} {{ f.views_f }}</span><span class="sp"></span><span class="btn-ink">{{ t.startReading }} →</span></span>
-</span>
-</a>
+<section class="wrap home-section home-feed" id="rank" aria-labelledby="feed-heading">
+<div class="home-section-head"><h2 id="feed-heading">{{ t.latestCollected }}</h2><label class="unread-filter" hidden data-unread-control><input type="checkbox" data-unread-only> {{ t.unreadOnly }}</label></div>
+{% for group in groups %}
+<section class="feed-day" data-feed-day>
+<h3><time datetime="{{ group.date }}">{{ group.label }}</time> · <span data-day-count>{{ count(group['items'] | length) }}</span></h3>
+{% with items = group['items'] %}{% include "_cards.html" %}{% endwith %}
 </section>
-{% endif %}
+{% else %}<p class="home-empty">{{ t.empty }}</p>{% endfor %}
+<p class="home-empty" data-unread-empty hidden>{{ t.unreadEmpty }}</p>
+{% if page > 1 or has_more %}<nav class="pager mono sm">{% if page > 1 %}<a href="?page={{ page - 1 }}#rank" rel="prev">← {{ t.prev }}</a>{% endif %}<span class="sp"></span>{% if has_more %}<a href="?page={{ page + 1 }}#rank" rel="next">{{ t.nextPage }} →</a>{% endif %}</nav>{% endif %}
+</section>
 
 {% if authors %}
 <section class="wrap sec">
-<div class="sec-hd" data-rv><h2 class="mono xs up">03 — {{ t.authorsLabel }}</h2><span class="hint">{{ t.authorsHint }}</span></div>
+<div class="sec-hd" data-rv><h2 class="mono xs up">{{ t.authorsLabel }}</h2><span class="hint">{{ t.authorsHint }}</span></div>
 <div class="s-authors home-au" data-rv>
 {% for a in authors %}<a href="/u/{{ a.handle }}" class="s-au"><span class="avatar sm" aria-hidden="true">{{ a.name[:1] | upper }}</span><b>{{ a.name }}</b><span class="mono xs">{{ count(a.n) }}</span></a>{% endfor %}
 </div>
@@ -63,7 +62,7 @@
 
 {% if topics %}
 <section class="wrap sec">
-<div class="sec-hd" data-rv><h2 class="mono xs up">04 — {{ t.topics }}</h2></div>
+<div class="sec-hd" data-rv><h2 class="mono xs up">{{ t.topics }}</h2></div>
 {% for tp in topics %}
 <a href="/t/{{ tp.key }}" class="idx idx-topic" data-rv>
 <span class="mono sm dim">{{ '%02d' % loop.index }}</span>
@@ -76,6 +75,9 @@
 {% endfor %}
 </section>
 {% endif %}
+
+{% elif view == 'rank' %}
+<section class="wrap rank-mast"><h1 class="{{ 'f-zh' if ui == 'zh' else 'f-en' }}">{{ t.fullRank }}</h1><a href="/">{{ t.discover }} →</a></section>
 
 {% elif view == 'cat' %}
 <section class="wrap mast">
@@ -168,7 +170,7 @@
 </section>
 {% endif %}
 
-{% if view in ('home', 'cat', 'author', 'saved', 'topic') or (view == 'search' and q) %}
+{% if view in ('rank', 'cat', 'author', 'saved', 'topic') or (view == 'search' and q) %}
 <section class="wrap list" id="rank">
 <div class="sec-hd list-hd" data-rv>
 <h2 class="mono xs up" data-list-label>{{ list_label }}</h2><span class="mono xs mute" data-list-count>{{ list_count if view != 'saved' }}</span>

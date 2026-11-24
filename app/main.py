@@ -6,7 +6,7 @@ import os
 import re
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 from pathlib import Path
 
@@ -143,21 +143,43 @@ def listing(request, ui, **filters):
 def home(request: Request):
     ui, base = ui_of(request), site_url(request)
     cats = db.categories()
-    for c in cats:
-        top = db.list_articles(cat=c["key"], limit=1)
-        c["top"] = top[0]["title"] if top else ""
-    featured = deco(db.list_articles(limit=1), ui)
-    authors = [a for a in db.authors() if a["n"]]  # 0 篇的作者页是空的，首页不列也不计数
+    if "sort" in request.query_params:
+        return RedirectResponse(f"/rank?sort={sort_of(request)}&page={page_of(request)}", status_code=302)
+    authors = [a for a in db.authors() if a["n"]]
     topics = topic_cards(ui)
-    lst = listing(request, ui)
-    total = sum(c["n"] for c in cats)
+    page = page_of(request)
+    rows = deco(db.list_articles(sort="collected", limit=PAGE + 1, offset=(page - 1) * PAGE), ui)
+    items = rows[:PAGE]
+    # 收录日采用北京时间，原帖日期仍保留在文章卡片。
+    beijing = timezone(timedelta(hours=8))
+    groups = []
+    for item in items:
+        day = parse_ts(item["created_at"]).astimezone(beijing).date()
+        if not groups or groups[-1]["date"] != day.isoformat():
+            label = (f"{day.month}月{day.day}日 · 星期{'一二三四五六日'[day.weekday()]}" if ui == "zh"
+                     else day.strftime("%b %d · %A"))
+            groups.append({"date": day.isoformat(), "label": label, "items": []})
+        groups[-1]["items"].append(item)
+    recent = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+    hot5 = deco(db.list_articles(sort="hot", created_since=recent, limit=5), ui)
     t = T[ui]
-    return render(request, "index.html", view="home", cats=cats, featured=featured[0] if featured else None,
-                  authors=authors, topics=topics, total=total, list_count=count(total, ui),
-                  list_label=("05" if topics else "04") + " — " + t["rankLabel"],
+    return render(request, "index.html", view="home", cats=cats, hot5=hot5, groups=groups,
+                  authors=authors, topics=topics, total=sum(c["n"] for c in cats),
+                  page=page, has_more=len(rows) > PAGE,
                   title="chuhainews — " + ("值得读完的长文" if ui == "zh" else "Long reads worth finishing"),
                   description=t["siteDesc"], canonical=base + "/",
-                  ld=[website_ld(base, ui), list_ld(base, t["rankLabel"], base + "/", lst["items"])], **lst)
+                  ld=[website_ld(base, ui), list_ld(base, t["articlesOf"], base + "/", items)])
+
+
+@app.get("/rank", response_class=HTMLResponse)
+def ranking(request: Request):
+    ui, base = ui_of(request), site_url(request)
+    t = T[ui]
+    lst = listing(request, ui)
+    return render(request, "index.html", view="rank", list_label=t["rankLabel"],
+                  list_count=count(sum(c["n"] for c in db.categories()), ui),
+                  title=t["rankLabel"] + " — chuhainews", description=t["siteDesc"],
+                  ld=[list_ld(base, t["rankLabel"], base + "/rank", lst["items"])], **lst)
 
 
 @app.get("/c/{key}", response_class=HTMLResponse)
