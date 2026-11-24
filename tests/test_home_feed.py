@@ -41,7 +41,11 @@ def test_home_collection_feed(tmp_path, monkeypatch):
         assert "导读 0" in home and "只看未读" in home
         assert 'data-save="feed-0"' in home and 'data-like="feed-0"' in home
         assert 'href="?page=2#rank"' in home
-        assert home.index('class="wrap home-section home-feed"') < home.index('class="s-authors home-au"')
+        # Hide the homepage author directory, not article attribution or author pages.
+        assert 'class="s-authors home-au"' not in home
+        assert "跟着人读" not in home
+        assert 'href="/u/writer"' in home and "Writer" in home
+        assert "1位作者" in home
         second = client.get("/?page=2").text
         assert re.findall(r'class="card" data-slug="([^"]+)"', second) == ["feed-30", "feed-31", old]
         rank = client.get("/rank?sort=views").text
@@ -55,3 +59,5 @@ def test_home_collection_feed(tmp_path, monkeypatch):
         client.cookies.set("ui", "en")
         en = client.get("/").text
         assert "Recently collected" in en and "Unread only" in en and "Full ranking" in en
+        assert 'class="s-authors home-au"' not in en
+        assert 'href="/u/writer"' in en and "Writer" in en
