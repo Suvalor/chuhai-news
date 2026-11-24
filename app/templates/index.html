@@ -55,7 +55,7 @@
 <section class="wrap sec">
 <div class="sec-hd" data-rv><h2 class="mono xs up">{{ t.topics }}</h2></div>
 {% for tp in topics %}
-<a href="/t/{{ tp.key }}" class="idx idx-topic" data-rv>
+<a href="{{ tp.path }}" class="idx idx-topic" data-rv>
 <span class="mono sm dim">{{ '%02d' % loop.index }}</span>
 <span class="idx-name"><b class="f-{{ font(tp.title) }}">{{ tp.title }}</b></span>
 <span class="idx-mid desk-only"><span>{{ tp.lead }}</span></span>
@@ -68,13 +68,19 @@
 {% endif %}
 
 {% elif view == 'rank' %}
-<section class="wrap rank-mast"><h1 class="{{ 'f-zh' if ui == 'zh' else 'f-en' }}">{{ t.fullRank }}</h1><a href="/">{{ t.discover }} →</a></section>
+<section class="wrap rank-mast"><h1 class="{{ 'f-zh' if ui == 'zh' else 'f-en' }}">{{ '出海与 AI 热门长文榜单' if ui == 'zh' else 'Trending global business and AI long reads' }}</h1><a href="/">{{ t.discover }} →</a></section>
+<section class="wrap home-section" aria-label="{{ '榜单口径' if ui == 'zh' else 'Ranking methodology' }}">
+{% if ui == 'zh' %}<p>完整榜单覆盖全部已发布文章。热度 =（阅读 × 0.01 + 赞 × 3 + 收藏 × 4）÷（原帖发布至今的天数 + 2），展示分按全站最高热度归一化。互动数包含来源平台与本站累计数据，并非本周新增量。</p><p>数据最近更新时间：{{ rank_updated or '暂无' }}（文章记录更新时间）；榜单计算时间：{{ rank_end }}。</p><h2>最近 7 天收录的热读前三</h2>
+{% else %}<p>The full ranking covers all published articles. Heat = (views × 0.01 + likes × 3 + saves × 4) / (days since source publication + 2), normalized to the highest site-wide score. Counts are cumulative, not weekly increments.</p><p>Latest article update: {{ rank_updated or 'N/A' }}; ranking calculated at {{ rank_end }}.</p><h2>Top 3 trending reads collected in the past 7 days</h2>{% endif %}
+<p class="mono sm mute">{{ rank_start }} — {{ rank_end }}</p>
+{% for it in rank_recent %}<article class="card"><h3 class="card-title"><a href="/a/{{ it.slug }}">{{ it.title_t if ui == 'zh' and it.lang == 'en' and it.title_t else it.title }}</a></h3>{% if it.summary %}<p class="card-summary">{{ it.summary }}</p>{% endif %}</article>{% else %}<p>{{ t.hotEmpty }}</p>{% endfor %}
+</section>
 
 {% elif view == 'cat' %}
 <section class="wrap mast">
 <nav class="chips" data-rv aria-label="{{ t.indexLabel }}">{% for c in cats %}<a href="/c/{{ c.key }}" class="tab mono sm{{ ' on' if c.key == cat.key }}">{{ '%02d' % loop.index }} {{ c.zh if ui == 'zh' else c.en }}</a>{% endfor %}</nav>
 <div class="mono xs up red" data-rv>{{ cat_no }} / {{ '%02d' % (cats | length) }} — {{ list_count }}</div>
-<h1 class="huge" data-rv><b class="{{ 'f-zh' if ui == 'zh' else 'f-' ~ font(cat_name) }}">{{ cat_name }}</b>{% if cat_alt != cat_name %}<i>{{ cat_alt }}</i>{% endif %}</h1>
+<h1 class="category-heading {{ 'f-zh' if ui == 'zh' else 'f-en' }}" data-rv>{{ cat_heading }}</h1>
 <p class="deck-l" data-rv>{{ cat_tag }}</p>
 </section>
 
@@ -115,7 +121,15 @@
 <section class="wrap mast">
 <span class="mono xs up red" data-rv>{{ t.topics }} — {{ list_count }}</span>
 <h1 class="huge" data-rv><b class="f-{{ font(tp.title) }}">{{ tp.title }}</b></h1>
-{% if tp.intro %}<p class="deck-l" data-rv>{{ tp.intro }}</p>{% endif %}
+{% if report %}<p class="mono sm mute">{{ report.start }} — {{ report.end }} (UTC+8)</p>{% endif %}
+{% if tp.intro %}<p class="deck-l editorial-take" style="white-space:pre-line" data-rv>{{ tp.intro }}</p>{% endif %}
+{% if report and report.kind == 'monthly' %}
+<div class="prose">
+<h2>{{ '数据口径与样本' if ui == 'zh' else 'Sample and methodology' }}</h2>
+<p>{{ '以北京时间当月收录且当前已发布的文章为样本；阅读、点赞、收藏为当前累计数（含来源平台），不是当月新增。最多统计 50,000 篇。' if ui == 'zh' else 'Sample: currently published articles collected during the month (UTC+8), up to 50,000. Views, likes and saves are current cumulative totals including the source platform, not monthly increments.' }}</p>
+<p>{{ count(report.sample) }} · {{ t.read }} {{ fmt(report.views) }} · {{ t.like }} {{ fmt(report.likes) }} · {{ t.save }} {{ fmt(report.saves) }}</p>
+<ul>{% for name, n in report.categories %}<li>{{ name }} — {{ count(n) }}</li>{% endfor %}</ul>
+</div>{% endif %}
 </section>
 
 {% elif view == 'about' %}
@@ -125,6 +139,7 @@
 <h1 class="huge" data-rv><b class="f-zh">关于 chuhainews</b></h1>
 <p class="deck-l" data-rv>chuhainews 由 chuhainews 编辑部运营，收录 X 上值得读完的长文，配中文翻译，按想解决的问题分类。</p>
 <div class="prose" data-rv>
+{% if editor %}<h2 id="editor">编辑 / 编译者</h2><p>{% if editor.url %}<a href="{{ editor.url }}" rel="noopener">{{ editor.name }}</a>{% else %}{{ editor.name }}{% endif %}{% if editor.bio %} · {{ editor.bio }}{% endif %}</p>{% endif %}
 <h2 id="editorial-standards">选什么</h2>
 <ul><li>作者写的是自己做过的事，有一手经验，不是二手转述。</li><li>对出海或 AI 实操有用，读完能拿去用。</li><li>在 X 上互动高，书签和转发多的长文优先。</li></ul>
 <h2>怎么翻译</h2>
@@ -138,6 +153,7 @@
 <h1 class="huge" data-rv><b class="f-en">About chuhainews</b></h1>
 <p class="deck-l" data-rv>chuhainews is run by the chuhainews editors. We collect long reads from X worth finishing, add a Chinese translation, and sort them by the problem you want to solve.</p>
 <div class="prose" data-rv>
+{% if editor %}<h2 id="editor">Editor</h2><p>{% if editor.url %}<a href="{{ editor.url }}" rel="noopener">{{ editor.name }}</a>{% else %}{{ editor.name }}{% endif %}{% if editor.bio %} · {{ editor.bio }}{% endif %}</p>{% endif %}
 <h2 id="editorial-standards">What we pick</h2>
 <ul><li>Authors writing about things they have done themselves, not second-hand summaries.</li><li>Useful for going global or for hands-on work with AI.</li><li>High engagement on X: pieces with many bookmarks and reposts come first.</li></ul>
 <h2>How we translate</h2>

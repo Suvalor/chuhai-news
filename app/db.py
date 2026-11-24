@@ -4,7 +4,7 @@ import os
 import re
 import sqlite3
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DB_PATH = Path(os.getenv("CHUHAI_DB", Path(__file__).resolve().parent.parent / "data" / "chuhai.db"))
@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS articles (
   author TEXT NOT NULL REFERENCES authors(handle),
   cat TEXT NOT NULL REFERENCES categories(key),
   source_url TEXT DEFAULT '', summary TEXT DEFAULT '', cover TEXT DEFAULT '',
+  editor_take TEXT NOT NULL DEFAULT '', license_status TEXT NOT NULL DEFAULT 'unknown', license_proof TEXT NOT NULL DEFAULT '',
   paras TEXT NOT NULL DEFAULT '[]',
   mins INTEGER DEFAULT 1,
   views INTEGER DEFAULT 0, likes INTEGER DEFAULT 0, saves INTEGER DEFAULT 0,
@@ -75,7 +76,10 @@ def init():
     with connect() as con:
         con.executescript(SCHEMA)
         cols = {r[1] for r in con.execute("PRAGMA table_info(articles)")}
-        for col, typ in [*((f"src_{f}", "INTEGER DEFAULT 0") for f in COUNTS), ("cover", "TEXT DEFAULT ''")]:  # 旧库补列
+        for col, typ in [*((f"src_{f}", "INTEGER DEFAULT 0") for f in COUNTS), ("cover", "TEXT DEFAULT ''"),
+                         ("editor_take", "TEXT NOT NULL DEFAULT ''"),
+                         ("license_status", "TEXT NOT NULL DEFAULT 'unknown'"),
+                         ("license_proof", "TEXT NOT NULL DEFAULT ''")]:  # 旧库补列
             if col not in cols:
                 con.execute(f"ALTER TABLE articles ADD COLUMN {col} {typ}")
         con.execute("PRAGMA journal_mode=WAL")
@@ -123,12 +127,14 @@ def _max_hot(con):
 
 
 def list_articles(*, cat=None, author=None, q=None, slugs=None, sort="hot", status="published",
-                  limit=50, offset=0, with_body=False, created_since=None):
+                  limit=50, offset=0, with_body=False, created_since=None, created_before=None):
     where, args = [], []
     if status:
         where.append("a.status=?"); args.append(status)
     if created_since is not None:
         where.append("julianday(a.created_at)>=julianday(?)"); args.append(created_since)
+    if created_before is not None:
+        where.append("julianday(a.created_at)<julianday(?)"); args.append(created_before)
     if cat:
         where.append("a.cat=?"); args.append(cat)
     if author:
@@ -288,6 +294,8 @@ def upsert_article(d):
                     mins=d.get("mins") or reading_minutes(d["paras"]), status=d.get("status", "published"),
                     published_at=d.get("published_at") or ts, updated_at=ts)
         counts = {f: d[f] for f in COUNTS if d.get(f) is not None}
+        # Only explicit editorial inputs may change these fields; webhook refreshes preserve them.
+        vals.update({k: d[k] for k in ("editor_take", "license_status", "license_proof") if k in d})
         if old:
             con.execute(f"UPDATE articles SET {', '.join(k + '=?' for k in vals)} WHERE id=?", [*vals.values(), old["id"]])
             for f, n in counts.items():
@@ -300,7 +308,7 @@ def upsert_article(d):
 
 def update_article(id, fields):
     allowed = {"title", "title_t", "slug", "lang", "author", "cat", "source_url", "summary", "cover", "paras", "mins",
-               "status", "published_at"}
+               "status", "published_at", "editor_take", "license_status", "license_proof"}
     fields = {k: v for k, v in fields.items() if k in allowed}
     if "paras" in fields:
         fields["paras"] = json.dumps(fields["paras"], ensure_ascii=False)
@@ -320,6 +328,34 @@ def update_author(handle, name, bio_zh, bio_en):
 
 
 TOPIC_STATUSES = ("published", "draft")
+
+
+def report_period(key):
+    """Editorial reports reuse topics; dates use Beijing calendar boundaries."""
+    tz = timezone(timedelta(hours=8))
+    week = re.fullmatch(r"weekly-(\d{4})-w(\d{2})", key)
+    month = re.fullmatch(r"monthly-(\d{4})-(\d{2})", key)
+    try:
+        if week:
+            year, number = map(int, week.groups())
+            start = datetime.fromisocalendar(year, number, 1).replace(tzinfo=tz)
+            return "weekly", start, start + timedelta(days=7)
+        if month:
+            year, number = map(int, month.groups())
+            start = datetime(year, number, 1, tzinfo=tz)
+            end = datetime(year + (number == 12), number % 12 + 1, 1, tzinfo=tz)
+            return "monthly", start, end
+    except (ValueError, OverflowError):
+        pass
+    return None
+
+
+def topic_path(key):
+    period = report_period(key)
+    if period:
+        kind = period[0]
+        return f"/{kind}/{key[len(kind) + 1:]}"
+    return f"/t/{key}"
 
 
 def topics(status=None):

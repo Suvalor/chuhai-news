@@ -9,7 +9,7 @@
 <link rel="canonical" href="{{ canonical }}">
 <meta property="og:site_name" content="chuhainews">
 <meta property="og:type" content="{{ og_type | default('website') }}">
-<meta property="og:title" content="{{ title }}">
+<meta property="og:title" content="{{ og_title | default(title) }}">
 <meta property="og:description" content="{{ description }}">
 <meta property="og:url" content="{{ canonical }}">
 <meta property="og:locale" content="{{ 'en_US' if ui == 'en' else 'zh_CN' }}">

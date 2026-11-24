@@ -36,7 +36,7 @@ def authed(request):
 
 
 def page(request, name, **kw):
-    r = templates.TemplateResponse(request, "admin/" + name, {"base": site_url(request), **kw})
+    r = templates.TemplateResponse(request, "admin/" + name, {"base": site_url(request), "topic_path": db.topic_path, **kw})
     r.headers["X-Robots-Tag"] = "noindex, nofollow"
     return r
 
@@ -140,7 +140,9 @@ def edit_form(request: Request, id: int):
 def save(request: Request, id: int = Form(0), title: str = Form(...), title_t: str = Form(""), slug: str = Form(""),
          lang: str = Form("en"), author: str = Form(...), cat: str = Form(...), source_url: str = Form(""),
          summary: str = Form(""), cover: str = Form(""), status: str = Form("draft"), published_at: str = Form(""),
-         orig: str = Form(...), trans: str = Form(""), new_author_name: str = Form("")):
+         orig: str = Form(...), trans: str = Form(""), new_author_name: str = Form(""),
+         editor_take: str | None = Form(None), license_status: str | None = Form(None),
+         license_proof: str | None = Form(None), editorial_fields: bool = Form(False)):
     if (r := guard(request)):
         return r
     try:
@@ -152,8 +154,19 @@ def save(request: Request, id: int = Form(0), title: str = Form(...), title_t: s
                 cover=cover.strip(),
                 status=status if status in db.STATUSES else "draft", paras=paras)
     a = db.get_article(id=id, include_unpublished=True) if id else None
+    if editorial_fields or editor_take is not None:
+        data["editor_take"] = (editor_take or "").strip()
+    if editorial_fields or license_status is not None:
+        data["license_status"] = license_status or "unknown"
+    if editorial_fields or license_proof is not None:
+        data["license_proof"] = (license_proof or "").strip()
+    effective = {**(a or {}), **data}
     err = ""
-    if img_err:
+    if effective.get("license_status", "unknown") not in ("unknown", "pending", "granted", "denied"):
+        err = "授权状态无效"
+    elif effective.get("license_status") == "granted" and not re.fullmatch(r"https?://[^\s]+", effective.get("license_proof", "")):
+        err = "已授权必须填写有效的 http(s) 凭证链接"
+    elif img_err:
         err = img_err
     elif not data["title"] or not paras:
         err = "标题和正文不能为空"
@@ -280,6 +293,8 @@ def create_topic(request: Request, key: str = Form(...), title: str = Form(...))
     key, err = key.strip().lower(), ""
     if not re.fullmatch(r"[a-z0-9_-]{1,60}", key):
         err = "key 只能用小写字母、数字、-、_（1–60 位）"
+    elif key.startswith(("weekly-", "monthly-")) and not db.report_period(key):
+        err = "周报 key 使用 weekly-YYYY-wNN，月报使用 monthly-YYYY-MM，日期必须有效"
     elif not title.strip():
         err = "标题不能为空"
     elif not db.create_topic(key, title.strip()):
@@ -314,6 +329,9 @@ def save_topic(request: Request, key: str, title: str = Form(...), intro: str = 
     if not title.strip():
         err = err or "标题不能为空"
     status = status if status in db.TOPIC_STATUSES else "draft"
+    if db.report_period(key) and status == "published":
+        if not intro.strip() or not parsed or not all(note.strip() and db.get_article(slug) for slug, note in parsed):
+            err = err or "发布周报/月报需填写真实总结，并为每篇已发布文章填写编辑判断与适用人群"
     if err:
         r = page(request, "topic.html", tp={**tp, "title": title, "intro": intro, "status": status, "sort": sort},
                  text=items, statuses=db.TOPIC_STATUSES, error=err)
@@ -321,7 +339,7 @@ def save_topic(request: Request, key: str, title: str = Form(...), intro: str = 
         return r
     db.save_topic(key, title.strip(), intro.strip(), parsed, status, sort)
     if "published" in (tp["status"], status):
-        ping(request, f"/t/{key}")
+        ping(request, db.topic_path(key))
     return RedirectResponse(f"/admin/topics/{key}?saved=1", 303)
 
 
@@ -332,5 +350,5 @@ def delete_topic(request: Request, key: str):
     tp = db.topic(key, include_draft=True)
     db.delete_topic(key)
     if tp and tp["status"] == "published":
-        ping(request, f"/t/{key}")
+        ping(request, db.topic_path(key))
     return RedirectResponse("/admin/topics", 303)

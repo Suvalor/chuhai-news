@@ -69,6 +69,7 @@
   function setVisible(art) {
     if (!art || art === visible) return;
     visible = art;
+    paintTranslation(art);
     const slug = art.dataset.art;
     const tpl = name => $(`template[data-tpl-${name}]`, art);
     const side = $('[data-side]');
@@ -113,10 +114,23 @@
     if (items.length > 1) go(items[(i - 1 + items.length) % items.length].getAttribute('href'));
   }
 
-  function toggleTrans() {
-    const on = body.classList.toggle('trans');
-    $$('[data-trans][aria-pressed]').forEach(b => b.setAttribute('aria-pressed', on));
-    if (!still) $$('[data-body], .art-h, .deck').forEach(el => el.animate([{ opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0)' }], { duration: 420, easing: ease }));
+  function paintTranslation(art) {
+    const on = art.classList.contains('translated');
+    body.classList.toggle('trans', on);
+    const btn = $('.trans-btn');
+    if (btn) {
+      btn.hidden = art.dataset.hasTrans !== '1';
+      btn.setAttribute('aria-pressed', String(on));
+      const label = $('[data-trans-label]', btn);
+      if (label) label.textContent = on ? label.dataset.original : label.dataset.translation;
+    }
+  }
+
+  function toggleTrans(art = currentArt()) {
+    if (!art || art.dataset.hasTrans !== '1') return;
+    art.classList.toggle('translated');
+    if (art === currentArt()) paintTranslation(art);
+    if (!still) $$('[data-body], .art-h, .deck', art).forEach(el => el.animate([{ opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0)' }], { duration: 420, easing: ease }));
   }
 
   let loading = false, ended = false;
@@ -162,7 +176,8 @@
     document.addEventListener('click', e => {
       const c = e.target.closest('button[data-ctx]');
       if (c) { body.dataset.ctx = c.dataset.ctx; paintRail(); ended = false; const f = $('[data-flow]'); if (f) f.textContent = f.dataset.more; }
-      if (e.target.closest('[data-trans]')) toggleTrans();
+      const translate = e.target.closest('[data-trans]');
+      if (translate) toggleTrans(translate.closest('[data-art]') || currentArt());
       if (e.target.closest('[data-go-next]')) step(1);
       if (e.target.closest('[data-sheet-open]')) openSheet();
       if (e.target.closest('[data-sheet-close]')) closeSheet();

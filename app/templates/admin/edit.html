@@ -15,6 +15,10 @@
 <label>原帖链接<input name="source_url" value="{{ a.source_url if a }}" placeholder="https://x.com/…"></label>
 <label class="span4">封面图（分享卡片用，https；留空取正文第一张图）<input name="cover" value="{{ a.cover if a }}" placeholder="https://pbs.twimg.com/media/…"></label>
 <label class="span4">编者导读（2～3 句编者判断，显示在正文前，也作 meta description；留空则不显示导读，描述取首段）<textarea name="summary" maxlength="600" rows="3" style="min-height:0">{{ a.summary if a }}</textarea></label>
+<input type="hidden" name="editorial_fields" value="true">
+<label class="span4">编辑深度拆解（原创分析建议至少 600 字；核心问题、可复用步骤、事实边界、中文团队落地建议）<textarea name="editor_take" rows="10">{{ a.editor_take if a else '' }}</textarea></label>
+<label>授权状态<select name="license_status">{% for k, n in [('unknown','未核实'),('pending','沟通中'),('granted','已授权'),('denied','未获授权')] %}<option value="{{ k }}" {{ 'selected' if a and a.license_status == k }}>{{ n }}</option>{% endfor %}</select></label>
+<label class="span2">授权凭证链接（仅后台可见）<input name="license_proof" value="{{ a.license_proof if a else '' }}" placeholder="https://…"></label>
 </div>
 <p class="mute">正文按空行分段；译文按同样顺序分段，第 N 段对应原文第 N 段。小标题写 <code>## 标题</code>，配图写 <code>![图注](https://图片地址)</code>，译文栏同一位置照写。</p>
 <div class="cols"><label>原文<textarea name="orig" required>{{ orig }}</textarea></label><label>译文<textarea name="trans">{{ trans }}</textarea></label></div>
