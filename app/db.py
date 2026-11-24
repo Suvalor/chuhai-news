@@ -123,10 +123,12 @@ def _max_hot(con):
 
 
 def list_articles(*, cat=None, author=None, q=None, slugs=None, sort="hot", status="published",
-                  limit=50, offset=0, with_body=False):
+                  limit=50, offset=0, with_body=False, created_since=None):
     where, args = [], []
     if status:
         where.append("a.status=?"); args.append(status)
+    if created_since is not None:
+        where.append("julianday(a.created_at)>=julianday(?)"); args.append(created_since)
     if cat:
         where.append("a.cat=?"); args.append(cat)
     if author:
@@ -138,10 +140,11 @@ def list_articles(*, cat=None, author=None, q=None, slugs=None, sort="hot", stat
         where.append("(a.title LIKE ? OR a.title_t LIKE ? OR a.paras LIKE ? OR u.name LIKE ? OR u.handle LIKE ? "
                      "OR c.zh LIKE ? OR c.en LIKE ?)")
         args += [like] * 7
+    order = "julianday(a.created_at) DESC" if sort == "collected" else SORTS.get(sort, SORTS["hot"])
     sql = (f"SELECT a.*, {HOT} AS hot, u.name AS author_name, c.zh AS cat_zh, c.en AS cat_en "
            "FROM articles a JOIN authors u ON u.handle=a.author JOIN categories c ON c.key=a.cat "
            + ("WHERE " + " AND ".join(where) if where else "")
-           + f" ORDER BY {SORTS.get(sort, SORTS['hot'])}, a.id DESC LIMIT ? OFFSET ?")
+           + f" ORDER BY {order}, a.id DESC LIMIT ? OFFSET ?")
     with connect() as con:
         top = _max_hot(con)
         rows = [_row(r) for r in con.execute(sql, [*args, limit, offset])]

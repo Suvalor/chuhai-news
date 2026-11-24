@@ -1,0 +1,14 @@
+{% for it in items %}
+<article class="card" data-slug="{{ it.slug }}">
+<div class="card-top">
+<div class="card-meta"><a href="/c/{{ it.cat }}">{{ it.cat_name }}</a><span>·</span><a href="/u/{{ it.author }}">{{ it.author_name }}</a><span>· {{ it.mins }} {{ t.min }} · {{ it.lang_label }} · <time datetime="{{ it.published_at }}">{{ it.date }}</time></span></div>
+<div class="card-actions">
+<button type="button" data-like="{{ it.slug }}" aria-label="{{ t.like }}" aria-pressed="false"><span class="glyph" data-off="♡" data-on="♥" aria-hidden="true">♡</span> <span data-n>{{ it.likes_f }}</span></button>
+<button type="button" data-save="{{ it.slug }}" aria-label="{{ t.save }}" aria-pressed="false"><span class="glyph" data-off="◇" data-on="◆" aria-hidden="true">◇</span></button>
+</div>
+</div>
+<h4 class="card-title f-{{ it.f }}"><a href="/a/{{ it.slug }}" class="stretch">{{ it.title }}</a></h4>
+{% if it.title_t %}<p class="card-translation" lang="{{ 'zh' if it.lang == 'en' else 'en' }}">{{ it.title_t }}</p>{% endif %}
+{% if it.summary %}<p class="card-summary"><span>{{ t.introLabel }}：</span>{{ it.summary }}</p>{% endif %}
+</article>
+{% endfor %}

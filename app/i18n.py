@@ -1,7 +1,7 @@
 """界面文案（照搬设计稿 T 字典）。界面语言用 Cookie `ui` 切换，与文章原文/译文开关无关。"""
 
 T = {
-    "zh": dict(discover="发现", saved="收藏", search="搜索", searchPh="搜标题、作者、话题",
+    "zh": dict(allCats="全部", hotToday="今日热读", fullRank="完整榜单", latestCollected="最新收录", unreadOnly="只看未读", unreadEmpty="本页未读文章已读完。", hotEmpty="最近三天暂无新收录文章。", discover="发现", saved="收藏", search="搜索", searchPh="搜标题、作者、话题",
                mastKicker="chuhainews — X 长文精选 · 原文阅读 · 一键翻译", mh1="X 上值得读完的长文，", mh2a="按你想解决的",
                mh2b="问题", mh2c="排好。", indexLabel="按问题找", indexHint="你现在最想解决什么？", mustLabel="今日必读",
                authorsLabel="作者", authorsHint="跟着人读，比跟着话题读更快", startReading="开始阅读", read="阅读",
@@ -22,7 +22,7 @@ T = {
                authorsUnit="位作者", prev="上一页", nextPage="下一页", readSource="阅读原帖", introLabel="编者导读", about="关于", topics="专题",
                ring="值得读完的长文 · LONG READS WORTH FINISHING · ",
                siteDesc="chuhainews 精选 X 上值得读完的长文：原文阅读、一键中英翻译，按认知、挣钱、AI、工具、出海、创作六类问题整理。"),
-    "en": dict(discover="Discover", saved="Saved", search="Search", searchPh="Titles, authors, topics",
+    "en": dict(allCats="All", hotToday="Trending reads", fullRank="Full ranking", latestCollected="Recently collected", unreadOnly="Unread only", unreadEmpty="You have read everything on this page.", hotEmpty="No articles collected in the last three days.", discover="Discover", saved="Saved", search="Search", searchPh="Titles, authors, topics",
                mastKicker="chuhainews — long reads from X · original text · one-tap translation",
                mh1="Long reads from X worth finishing,", mh2a="sorted by the ", mh2b="problem", mh2c=" you want to solve.",
                indexLabel="Find by problem", indexHint="What are you trying to solve?", mustLabel="Must read today",
