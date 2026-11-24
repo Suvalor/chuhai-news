@@ -19,9 +19,9 @@ T = {
                footRights="版权与署名", footResources="订阅与资源", footFeed="RSS 订阅",
                tools="工具", excelRatio="Excel 比例分摊计算器",
                excelDesc="在线按比例分摊 Excel 金额、费用或其他数值。同名记录自动汇总，结果可复制回 Excel。表格内容在浏览器内处理。",
-               authorsUnit="位作者", prev="上一页", nextPage="下一页", readSource="阅读原帖", introLabel="编者导读", about="关于", topics="专题",
+               authorsUnit="位作者", prev="上一页", nextPage="下一页", readSource="阅读原帖", introLabel="编者导读", editorTake="编辑深度拆解", licensed="已获作者授权", originalSwitch="原文", about="关于", topics="专题",
                ring="值得读完的长文 · LONG READS WORTH FINISHING · ",
-               siteDesc="chuhainews 精选 X 上值得读完的长文：原文阅读、一键中英翻译，按认知、挣钱、AI、工具、出海、创作六类问题整理。"),
+               siteDesc="chuhainews 精选出海与 AI 实战长文，提供中英编译、编者导读与深度拆解，覆盖认知、商业增长、AI Agent、效率工具、海外市场与内容创作。"),
     "en": dict(allCats="All", hotToday="Trending reads", fullRank="Full ranking", latestCollected="Recently collected", unreadOnly="Unread only", unreadEmpty="You have read everything on this page.", hotEmpty="No articles collected in the last three days.", discover="Discover", saved="Saved", search="Search", searchPh="Titles, authors, topics",
                mastKicker="chuhainews — long reads from X · original text · one-tap translation",
                mh1="Long reads from X worth finishing,", mh2a="sorted by the ", mh2b="problem", mh2c=" you want to solve.",
@@ -44,9 +44,8 @@ T = {
                footFeed="RSS feed", authorsUnit="authors", prev="Previous", nextPage="Next page",
                tools="Tools", excelRatio="Excel Ratio Converter",
                excelDesc="Split Excel amounts or expenses by ratio, total matching names by column, and copy the results back to Excel. Runs in your browser.",
-               readSource="Read the original", introLabel="Editor’s note", about="About", topics="Topics", ring="LONG READS WORTH FINISHING · 值得读完的长文 · ",
-               siteDesc="chuhainews curates long reads from X worth finishing — original text with one-tap translation, "
-                        "organised by the problem you want to solve."),
+               readSource="Read the original", introLabel="Editor’s note", editorTake="Editorial analysis", licensed="Author permission granted", originalSwitch="Original", about="About", topics="Topics", ring="LONG READS WORTH FINISHING · 值得读完的长文 · ",
+               siteDesc="chuhainews curates practical AI and global business long reads from X, with bilingual translations, editorial notes and in-depth analysis."),
 }
 
 HOT_QUERIES = {"zh": ["Agent", "定价", "出海", "写作", "Eval", "本地化"],

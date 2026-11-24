@@ -46,7 +46,7 @@ def get_article(slug: str) -> dict:
     a = db.get_article(slug)
     if not a:
         raise ValueError(f"找不到文章 {slug}")
-    return {**_card(a), "summary": a["summary"], "cover": a["cover"],
+    return {**_card(a), "summary": a["summary"], "editor_take": a["editor_take"], "license_status": a["license_status"], "cover": a["cover"],
             "author_bio": {"zh": a["bio_zh"], "en": a["bio_en"]},
             "paragraphs": [{"type": {"h2": "heading", "img": "image"}.get(p[2], "paragraph") if len(p) > 2 else "paragraph",
                             "text": p[0], "translation": p[1], **({"src": p[3]} if len(p) > 3 else {})} for p in a["paras"]]}
@@ -69,7 +69,7 @@ def list_authors() -> list[dict]:
 @mcp.tool()
 def list_topics() -> list[dict]:
     """列出编辑部策划的专题：每个专题有导语和按顺序排列的文章，note 是该篇的入选理由。"""
-    return [{"key": t["key"], "title": t["title"], "intro": t["intro"], "url": f"{_base()}/t/{t['key']}",
+    return [{"key": t["key"], "title": t["title"], "intro": t["intro"], "url": _base() + db.topic_path(t["key"]),
              "articles": [{**_card(a), "note": a["note"]} for a in db.topic_articles(t)]} for t in db.topics("published")]
 
 

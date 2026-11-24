@@ -92,12 +92,46 @@ def deco(rows, ui):
     return rows
 
 
+# Index admission is shared by the page and sitemap. Character count is a
+# minimum editorial gate, not an automatic assessment of originality.
+def article_indexable(a):
+    analysis = len(re.sub(r"\s+", "", a.get("editor_take") or ""))
+    summary = len(re.sub(r"\s+", "", a.get("summary") or ""))
+    authorized = (a.get("license_status") == "granted"
+                  and bool(re.fullmatch(r"https?://[^\s]+", a.get("license_proof") or "")))
+    return a.get("status") == "published" and (analysis >= 600 or (authorized and summary >= 80))
+
+
+def article_title(a, ui):
+    if ui == "zh" and a["lang"] == "en" and a["title_t"]:
+        return a["title_t"]
+    return a["title"]
+
+
+def category_heading(cat, ui):
+    names = {
+        "cog": ("认知与决策长文精选：思维模型、判断与决策", "Thinking and decision-making: mental models and judgment"),
+        "money": ("商业增长与挣钱长文精选：商业模式、定价与增长", "Business and growth: business models, pricing and growth"),
+        "ai": ("AI 实战长文精选：模型、Agent 与工作流", "Practical AI long reads: models, agents and workflows"),
+        "tool": ("效率工具长文精选：软件、清单与模板", "Practical tools: software, checklists and templates"),
+        "global": ("出海实战长文精选：本地化、海外市场与获客", "Going global: localization, overseas markets and acquisition"),
+        "create": ("内容创作长文精选：写作、长文与个人品牌", "Content creation: writing, long reads and personal brands"),
+    }
+    return names.get(cat["key"], (cat["zh"], cat["en"]))[ui == "en"]
+
+
 def render(request, name, status=200, **kw):
     ui = ui_of(request)
     base = site_url(request)
     now = datetime.now()
     kw.setdefault("canonical", base + request.url.path)
     kw.setdefault("robots", "index,follow,max-image-preview:large,max-snippet:-1")
+    if kw.get("page") and kw["page"] > 1:
+        kw["robots"] = "noindex,follow"
+        query = f"?page={kw['page']}"
+        if kw.get("sort") and request.url.path != "/":
+            query += f"&sort={kw['sort']}"
+        kw["canonical"] += query
     return templates.TemplateResponse(request, name, {
         "ui": ui, "t": T[ui], "base": base, "path": request.url.path, "font": font, "fmt": fmt,
         "count": lambda n: count(n, ui), "today": now.strftime("%Y.%m.%d"), "year": now.year, **kw}, status_code=status)
@@ -168,7 +202,8 @@ def home(request: Request):
     return render(request, "index.html", view="home", cats=cats, hot5=hot5, groups=groups,
                   authors=authors, topics=topics, total=sum(c["n"] for c in cats),
                   page=page, has_more=len(rows) > PAGE,
-                  title="chuhainews — " + ("值得读完的长文" if ui == "zh" else "Long reads worth finishing"),
+                  title=("出海与 AI 实战长文精选、编译与深度拆解 — chuhainews" if ui == "zh" else
+                         "Global business & practical AI: curated long reads and editorial analysis — chuhainews"),
                   description=t["siteDesc"], canonical=base + "/",
                   ld=[website_ld(base, ui), list_ld(base, t["articlesOf"], base + "/", items)])
 
@@ -178,9 +213,15 @@ def ranking(request: Request):
     ui, base = ui_of(request), site_url(request)
     t = T[ui]
     lst = listing(request, ui)
+    now = datetime.now(timezone.utc)
+    recent = deco(db.list_articles(sort="hot", created_since=(now - timedelta(days=7)).isoformat(), limit=3), ui)
+    latest = db.list_articles(sort="new", limit=50000)
+    updated = max((a["updated_at"] for a in latest), default=None)
     return render(request, "index.html", view="rank", list_label=t["rankLabel"],
-                  list_count=count(sum(c["n"] for c in db.categories()), ui),
-                  title=t["rankLabel"] + " — chuhainews", description=t["siteDesc"],
+                  rank_recent=recent, rank_start=(now - timedelta(days=7)).strftime("%Y-%m-%d %H:%M UTC"),
+                  rank_end=now.strftime("%Y-%m-%d %H:%M UTC"), rank_updated=updated,
+                  list_count=count(len(latest), ui), robots="index,follow" if latest else "noindex,follow",
+                  title=("出海与 AI 热门长文榜单" if ui == "zh" else "Trending global business and AI long reads") + " — chuhainews", description=t["siteDesc"],
                   ld=[list_ld(base, t["rankLabel"], base + "/rank", lst["items"])], **lst)
 
 
@@ -195,10 +236,12 @@ def category(request: Request, key: str):
     name, alt = (cat["zh"], cat["en"]) if ui == "zh" else (cat["en"], cat["zh"])
     lst = listing(request, ui, cat=key)
     url = f"{base}/c/{key}"
-    return render(request, "index.html", view="cat", cats=cats, cat=cat, cat_name=name, cat_alt=alt,
+    heading = category_heading(cat, ui)
+    return render(request, "index.html", view="cat", cats=cats, cat=cat, cat_name=name, cat_alt=alt, cat_heading=heading,
                   cat_no=f"{cats.index(cat) + 1:02d}", cat_tag=cat["tag_zh"] if ui == "zh" else cat["tag_en"],
                   list_label=f"{name} — {t['rankLabel']}", list_count=count(cat["n"], ui),
-                  title=(f"{name} · {alt}" if alt != name else name) + " — chuhainews", description=(cat["tag_zh"] if ui == "zh" else cat["tag_en"]),
+                  title=heading + " — chuhainews", description=(cat["tag_zh"] if ui == "zh" else cat["tag_en"]),
+                  robots="index,follow" if cat["n"] else "noindex,follow",
                   canonical=url, ld=[list_ld(base, name, url, lst["items"]),
                                      crumbs_ld([("chuhainews", base + "/"), (name, url)])], **lst)
 
@@ -219,6 +262,7 @@ def author_page(request: Request, handle: str):
     return render(request, "index.html", view="author", au=au, bio=bio, list_label=t["articlesOf"],
                   list_count=count(au["n"], ui), title=f"{au['name']} (@{handle}) — chuhainews",
                   description=bio or f"{au['name']} — {t['articlesOf']}", canonical=url,
+                  robots="index,follow" if au["n"] >= 2 else "noindex,follow",
                   ld=[person, crumbs_ld([("chuhainews", base + "/"), (au["name"], url)])], **lst)
 
 
@@ -246,9 +290,9 @@ def topic_cards(ui):
     """已发布且至少有一篇在架文章的专题。"""
     out = []
     for tp in db.topics("published"):
-        n = len(db.topic_articles(tp))
-        if n:
-            out.append({**tp, "n": n, "lead": first_sentence(tp["intro"])})
+        items = db.topic_articles(tp)
+        if items and (not db.report_period(tp["key"]) or (tp["intro"].strip() and all(a["note"].strip() for a in items))):
+            out.append({**tp, "n": len(items), "lead": first_sentence(tp["intro"]), "path": db.topic_path(tp["key"])})
     return out
 
 
@@ -258,14 +302,47 @@ def topic_page(request: Request, key: str):
     tp = db.topic(key)
     if not tp:
         return not_found(request)
+    path = db.topic_path(key)
+    if request.url.path != path:
+        return RedirectResponse(path, status_code=301)
     items = deco(db.topic_articles(tp), ui)
-    url = f"{base}/t/{key}"
-    return render(request, "index.html", view="topic", tp=tp, items=items, sort="topic", page=None, has_more=False,
+    period = db.report_period(key)
+    report = None
+    if period:
+        kind, start, end = period
+        if not items or not tp["intro"].strip() or not all(a["note"].strip() for a in items):
+            return not_found(request)
+        report = {"kind": kind, "start": start.date().isoformat(), "end": (end - timedelta(days=1)).date().isoformat()}
+        if kind == "monthly":
+            cohort = db.list_articles(sort="collected", created_since=start.isoformat(), created_before=end.isoformat(), limit=50000)
+            report["sample"] = len(cohort)
+            report["views"] = sum(a["views"] for a in cohort)
+            report["likes"] = sum(a["likes"] for a in cohort)
+            report["saves"] = sum(a["saves"] for a in cohort)
+            report["categories"] = [(c["zh"] if ui == "zh" else c["en"], sum(a["cat"] == c["key"] for a in cohort)) for c in db.categories()]
+    url = base + path
+    return render(request, "index.html", view="topic", tp=tp, items=items, report=report, sort="topic", page=None, has_more=False,
                   list_label=T[ui]["topics"], list_count=count(len(items), ui), title=f"{tp['title']} — chuhainews",
                   description=tp["intro"][:160] or tp["title"], canonical=url,
                   robots="index,follow" if items else "noindex,follow",  # 文章全下架的专题不进索引
                   ld=[{**list_ld(base, tp["title"], url, items), **({"description": tp["intro"]} if tp["intro"] else {})},
                       crumbs_ld([("chuhainews", base + "/"), (tp["title"], url)])])
+
+
+@app.get("/weekly/{period}", response_class=HTMLResponse)
+def weekly(request: Request, period: str):
+    key = "weekly-" + period
+    if not db.report_period(key):
+        return not_found(request)
+    return topic_page(request, key)
+
+
+@app.get("/monthly/{period}", response_class=HTMLResponse)
+def monthly(request: Request, period: str):
+    key = "monthly-" + period
+    if not db.report_period(key):
+        return not_found(request)
+    return topic_page(request, key)
 
 
 @app.get("/about", response_class=HTMLResponse)
@@ -275,18 +352,29 @@ def about(request: Request):
     org = {"@type": "Organization", "name": "chuhainews", "url": base + "/", **({"email": email} if email else {})}
     ld = {"@context": "https://schema.org", "@type": "AboutPage", "url": base + "/about", "inLanguage": ["zh-CN", "en"],
           "mainEntity": org}
-    return render(request, "index.html", view="about", email=email, items=[],
+    return render(request, "index.html", view="about", email=email, items=[], editor=editor_profile(),
                   title=T[ui]["about"] + " — chuhainews", canonical=base + "/about",
                   description="chuhainews 由 chuhainews 编辑部运营：选文标准、AI 翻译说明、版权与删除联系方式。" if ui == "zh" else
                   "Who runs chuhainews, how articles are picked and translated, and how authors can request removal.",
                   ld=[ld, crumbs_ld([("chuhainews", base + "/"), (T[ui]["about"], base + "/about")])])
 
 
+def editor_profile():
+    name = os.getenv("EDITOR_NAME", "").strip()
+    if not name:
+        return None
+    profile = {"name": name, "bio": os.getenv("EDITOR_BIO", "").strip()}
+    url = os.getenv("EDITOR_URL", "").strip()
+    if re.fullmatch(r"https?://[^\s]+", url):
+        profile["url"] = url
+    return profile
+
+
 def article_ctx(a, ui, base):
     bio = (a["bio_zh"] or a["bio_en"]) if ui == "zh" else (a["bio_en"] or a["bio_zh"])
     rails = {c: deco(db.context_list(a, c), ui) for c in ("author", "cat")}
     nxt = {c: db.next_for(a, c) for c in ("author", "cat")}
-    return dict(a=a, bio=bio, rails=rails, nxt=nxt, url=f"{base}/a/{a['slug']}")
+    return dict(a=a, bio=bio, rails=rails, nxt=nxt, url=f"{base}/a/{a['slug']}", editor=editor_profile())
 
 
 @app.get(EXCEL_RATIO_PATH, response_class=HTMLResponse)
@@ -303,12 +391,15 @@ def excel_ratio_converter(request: Request):
                   description=t["excelDesc"], ld=[ld, crumbs_ld([("chuhainews", base + "/"), (t["excelRatio"], url)])])
 
 
+@app.head("/a/{slug}.md", response_class=PlainTextResponse, include_in_schema=False)
 @app.get("/a/{slug}.md", response_class=PlainTextResponse)
 def article_md(request: Request, slug: str):
     a = db.get_article(slug)
     if not a:
         return PlainTextResponse("not found", 404)
-    return PlainTextResponse(to_markdown(a, site_url(request)), media_type="text/markdown; charset=utf-8")
+    return PlainTextResponse(to_markdown(a, site_url(request)), media_type="text/markdown; charset=utf-8",
+                             headers={"Link": f'<{site_url(request)}/a/{a["slug"]}>; rel="canonical"',
+                                      "X-Robots-Tag": "noindex"})
 
 
 @app.get("/a/{slug}", response_class=HTMLResponse)
@@ -320,10 +411,11 @@ def read(request: Request, slug: str):
     deco([a], ui)
     c = article_ctx(a, ui, base)
     desc = a["summary"] or excerpt(a)
+    preferred = article_title(a, ui)
     image = a["cover"] or next((p[3] for p in a["paras"] if len(p) > 3), None)  # 没封面就用正文第一张图
-    ld = {"@context": "https://schema.org", "@type": "Article", "headline": a["title"][:110],
-          "alternativeHeadline": a["title_t"] or None, "description": desc, "url": c["url"],
-          "mainEntityOfPage": c["url"], "inLanguage": "zh-CN" if a["lang"] == "zh" else "en",
+    ld = {"@context": "https://schema.org", "@type": "Article", "headline": preferred[:110],
+          "alternativeHeadline": (a["title"] if preferred != a["title"] else a["title_t"]) or None, "description": desc, "url": c["url"],
+          "mainEntityOfPage": c["url"], "inLanguage": "zh-CN" if ui == "zh" and (a["lang"] == "zh" or a["has_trans"]) else a["lang"],
           "datePublished": a["published_at"], "dateModified": a["updated_at"], "wordCount": len(" ".join(p[0] for p in a["paras"])),
           "timeRequired": f"PT{a['mins']}M", "articleSection": a["cat_name"],
           "author": {"@type": "Person", "name": a["author_name"], "url": f"https://x.com/{a['author']}"},
@@ -332,9 +424,15 @@ def read(request: Request, slug: str):
           "interactionStatistic": [
               {"@type": "InteractionCounter", "interactionType": "https://schema.org/ReadAction", "userInteractionCount": a["views"]},
               {"@type": "InteractionCounter", "interactionType": "https://schema.org/LikeAction", "userInteractionCount": a["likes"]}]}
+    if c["editor"] and a["editor_take"]:
+        editor = c["editor"]
+        ld["editor"] = {"@type": "Person", "name": editor["name"],
+                        **({"url": editor["url"]} if editor.get("url") else {})}
     ld = {k: v for k, v in ld.items() if v is not None}
     crumbs = crumbs_ld([("chuhainews", base + "/"), (a["cat_name"], f"{base}/c/{a['cat']}"), (a["title"], c["url"])])
-    return render(request, "read.html", view="read", title=f"{a['title']} — {a['author_name']} · chuhainews",
+    return render(request, "read.html", view="read", title=f"{preferred} — {a['author_name']} · chuhainews",
+                  og_title=f"{preferred} · {a['title']} — chuhainews" if preferred != a["title"] else f"{a['title']} — chuhainews",
+                  robots="index,follow,max-image-preview:large,max-snippet:-1" if article_indexable(a) else "noindex,follow",
                   description=desc, canonical=c["url"], og_type="article", ld=[ld, crumbs], image=image,
                   md_url=c["url"] + ".md", **c)
 
@@ -404,7 +502,7 @@ def robots(request: Request):
     base = site_url(request)
     group = lambda bots, rule: "".join(f"User-agent: {b}\n" for b in bots) + rule + "\n\n"
     return ("# 搜索引擎与 AI 搜索可以抓取和引用；模型训练爬虫不可抓取。原文版权归各作者所有。\n"
-            + group(["*"], "Allow: /") + group(AI_SEARCH_BOTS, "Allow: /") + group(AI_TRAINING_BOTS, "Disallow: /")
+            + group(["*"], "Disallow: /ui/\nAllow: /") + group(AI_SEARCH_BOTS, "Disallow: /ui/\nAllow: /") + group(AI_TRAINING_BOTS, "Disallow: /")
             + f"Sitemap: {base}/sitemap.xml\n# LLM 导航: {base}/llms.txt\n")
 
 
@@ -418,10 +516,12 @@ def sitemap(request: Request):
     arts = db.list_articles(sort="new", limit=50000)
     urls = [(base + "/", arts[0]["updated_at"] if arts else None)]
     urls += [(base + "/about", None), (base + EXCEL_RATIO_PATH, None)]
-    urls += [(f"{base}/t/{tp['key']}", tp["updated_at"]) for tp in topic_cards("zh")]
+    if arts:
+        urls.append((base + "/rank", None))
+    urls += [(base + tp["path"], tp["updated_at"]) for tp in topic_cards("zh")]
     urls += [(f"{base}/c/{c['key']}", None) for c in db.categories() if c["n"]]
-    urls += [(f"{base}/u/{a['handle']}", None) for a in db.authors() if a["n"]]
-    urls += [(f"{base}/a/{a['slug']}", a["updated_at"]) for a in arts]
+    urls += [(f"{base}/u/{a['handle']}", None) for a in db.authors() if a["n"] >= 2]
+    urls += [(f"{base}/a/{a['slug']}", a["updated_at"]) for a in arts if article_indexable(a)]
     body = "".join(f"<url><loc>{xml_escape(u)}</loc>" + (f"<lastmod>{m}</lastmod>" if m else "") + "</url>"
                    for u, m in urls)
     return Response('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
@@ -471,7 +571,8 @@ def api_article(request: Request, slug: str):
     kinds = {"h2": "heading", "img": "image"}
     paras = [{"type": kinds.get(p[2] if len(p) > 2 else "p", "paragraph"), "text": p[0], "translation": p[1],
               **({"src": p[3]} if len(p) > 3 else {})} for p in a["paras"]]
-    return {**article_brief({**a, "author_name": a["author_name"]}, site_url(request)), "paragraphs": paras}
+    return {**article_brief({**a, "author_name": a["author_name"]}, site_url(request)),
+            "editor_take": a["editor_take"], "license_status": a["license_status"], "paragraphs": paras}
 
 def excerpt(a, n=160):
     """没填摘要时的描述：取开头几段正文（跳过小标题和配图）凑满 n 字。"""
@@ -502,6 +603,10 @@ def to_markdown(a, base):
               f"- 原帖 / Source: {a['source_url'] or '—'}", f"- 本页 / Canonical: {base}/a/{a['slug']}", ""]
     if a["summary"]:
         lines += ["## 编者导读 / Editor's note", "", a["summary"], ""]
+    if a["editor_take"]:
+        lines += ["## 编辑深度拆解 / Editorial analysis", "", a["editor_take"], ""]
+    if a["license_status"] == "granted" and a["license_proof"]:
+        lines += ["作者已授权 / Author permission granted", ""]
     lines += ["## 原文 / Original", ""]
     lines += [md_block(p, 0) + "\n" for p in a["paras"]]
     if a["has_trans"]:
@@ -522,7 +627,7 @@ def llms(request: Request):
     tps = topic_cards("zh")
     if tps:
         out += ["## 专题 / Topics", ""]
-        out += [f"- [{tp['title']}]({base}/t/{tp['key']}): {tp['n']} 篇" + (f" — {tp['lead']}" if tp["lead"] else "")
+        out += [f"- [{tp['title']}]({base}{tp['path']}): {tp['n']} 篇" + (f" — {tp['lead']}" if tp["lead"] else "")
                 for tp in tps]
         out.append("")
     for c in db.categories():

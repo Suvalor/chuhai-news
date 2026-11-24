@@ -294,7 +294,8 @@ body[data-view="home"] .ft-nav h2, body[data-view="home"] .ft-meta, body[data-vi
 .trans-btn { flex-shrink: 0; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 4px 0 12px; border: 1px solid var(--ink); border-radius: 999px; background: transparent; cursor: pointer; font-size: 12px; }
 .track { position: relative; width: 40px; height: 22px; border-radius: 11px; background: var(--track); transition: background .24s; }
 .knob { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 8px; background: var(--paper); transition: left .26s cubic-bezier(.2, .7, .2, 1); }
-.trans .track { background: var(--red); } .trans .knob { left: 21px; }
+.trans-btn[aria-pressed="true"] .track { background: var(--red); } .trans-btn[aria-pressed="true"] .knob { left: 21px; }
+.trans-btn[hidden] { display: none; }
 .progress { height: 2px; } .progress i { display: block; height: 2px; width: 0; background: var(--red); transition: width .12s linear; }
 
 .rd-grid { display: grid; grid-template-columns: minmax(0, 680px); gap: 72px; justify-content: center; align-items: start; padding-top: 56px; }
@@ -340,11 +341,13 @@ body[data-view="home"] .ft-nav h2, body[data-view="home"] .ft-meta, body[data-vi
 .flow-foot { font-family: var(--serif-en); font-style: italic; font-size: 22px; color: var(--mute2); text-align: center; padding: 40px 20px 160px; }
 @media (max-width: 1179px) { .flow-foot { padding-bottom: 120px; } }
 
-/* 翻译开关：.tr 默认隐藏；body.trans 时有译文的元素隐藏原文、显示译文 */
+/* Each article keeps its own reading language during infinite reading. */
 .tr, .tr-only { display: none; }
-.trans .has-t > .o { display: none; }
-.trans .has-t > .tr { display: inline; }
-.trans .tr-only { display: flex; }
+.art.translated .has-t > .o, .trans .rail .has-t > .o, .trans .sheet .has-t > .o, .trans .side .has-t > .o { display: none; }
+.art.translated .has-t > .tr, .trans .rail .has-t > .tr, .trans .sheet .has-t > .tr, .trans .side .has-t > .tr { display: inline; }
+.art.translated .tr-only { display: flex; }
+.category-heading { font-size: clamp(1.75rem, 4vw, 3.5rem); line-height: 1.3; margin-top: 16px; overflow-wrap: anywhere; }
+.editorial-take p { white-space: pre-line; overflow-wrap: anywhere; }
 .deck.has-t > .tr { font-style: italic; }
 
 .side { gap: 28px; }

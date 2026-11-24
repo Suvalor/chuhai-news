@@ -173,20 +173,24 @@ claude mcp add --transport http chuhainews https://你的域名/mcp --header "Au
 | title / description / canonical / Open Graph / Twitter Card | 每页单独生成；搜索、收藏页 `noindex,follow` |
 | JSON-LD | WebSite+SearchAction、Article（含作者、原帖 isBasedOn、阅读/赞计数）、BreadcrumbList、ProfilePage、CollectionPage（类目、专题）、AboutPage+Organization |
 | `/sitemap.xml`、`/feed.xml` | 站点地图与 RSS |
-| `/robots.txt` | 允许所有爬虫；显式列出 GPTBot、ClaudeBot、PerplexityBot 等 AI 爬虫 |
-| `/llms.txt`、`/llms-full.txt` | 给大模型的站点导航与全文合集 |
-| `/a/<slug>.md` | 每篇文章的 Markdown 版本，HTML 用 `rel=alternate type=text/markdown` 声明 |
+| `/robots.txt` | AI 搜索与训练爬虫分组；搜索爬虫可访问内容，禁止无效的 `/ui/` 跳转抓取 |
+| `/llms.txt`、`/llms-full.txt` | 给大模型的站点导航与文章导读合集 |
+| `/a/<slug>.md` | 单篇 Markdown；GET/HEAD 返回 HTML canonical 与 `X-Robots-Tag: noindex` |
 | 编者导读 | `summary` 显示在正文前并进 `.md`、`llms.txt`：本站相对原帖的原创增量 |
 | IndexNow | 文章或专题的公开状态变化时（发布、修改、下架、删除；一直是草稿的不推），后台线程通知 `api.indexnow.org`（Bing、Yandex、Naver 等，Google 不参与）；密钥文件在 `/<INDEXNOW_KEY>.txt`；失败只写日志 `chuhai.indexnow`，不影响发布 |
 | `/about` | 运营方、选文标准、翻译方式（AI 翻译，未逐篇校对）、版权与删除联系；`llms.txt` 开头指向它 |
 | `/t/<key>` 专题 | 编辑部策划的主题合集，带导语与每篇入选理由；进 sitemap、`llms.txt`、MCP |
+| `/weekly/YYYY-wNN`、`/monthly/YYYY-MM` | 在后台专题分别以 `weekly-YYYY-wNN`、`monthly-YYYY-MM` 新建；填写真实总结和逐篇编辑判断、适用人群后发布。月报展示北京时间收录样本的当前累计指标，并标注统计口径 |
+| 索引分层 | 发布文章默认 `noindex,follow`；非空白编辑拆解至少 600 字，或授权状态为已授权、有凭证链接且导读至少 80 字时开放索引并纳入 sitemap。字数仅为最低技术门槛，不保证内容质量；凭证只在后台保存。单篇作者页、空分类、后续分页不进入索引 |
 
 ## 让搜索引擎收录（上线后做一次）
 
 1. 设置 `SITE_URL`（https）和 `INDEXNOW_KEY`，重启后确认 `https://你的域名/<INDEXNOW_KEY>.txt` 能打开、内容就是密钥。
 2. Google Search Console 验证域名，提交 `https://你的域名/sitemap.xml`。Google 不支持 IndexNow，也停用了 sitemap ping，之后靠它定期重读 sitemap。
 3. Bing Webmaster Tools 从 Search Console 导入站点。新文章由 IndexNow 推送；Bing 的索引也供 ChatGPT 搜索、Copilot、DuckDuckGo 等使用。
-4. AI 爬虫（GPTBot、ClaudeBot、PerplexityBot 等）没有提交接口，靠 `robots.txt` 放行、sitemap、`llms.txt` 和站内链接自己发现。
+4. AI 搜索爬虫通过站内链接、sitemap 等发现页面；训练爬虫与搜索爬虫应分别管理。允许抓取不保证收录、引用或排名；`noindex` 也可能减少搜索型 AI 的可见性。
+5. 可设置公开的真实编辑资料 `EDITOR_NAME`、`EDITOR_BIO`、`EDITOR_URL`，用于关于页及编辑拆解署名；未设置时不虚构身份。
+6. RSS 接入示例：`curl -fsSL https://www.chuhainews.com/feed.xml`；只读 MCP 接入见上方 MCP 章节。
 
 ## 前台交互
 

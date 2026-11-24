@@ -1,5 +1,6 @@
 {% import "_macros.html" as m with context %}
-<article class="art" data-art="{{ a.slug }}" data-title="{{ a.title }} — {{ a.author_name }} · chuhainews">
+{% set translated = a.has_trans and a.lang != ui %}
+<article class="art{{ ' translated' if translated }}" data-art="{{ a.slug }}" data-has-trans="{{ '1' if a.has_trans else '0' }}" data-title="{{ a.title_t if translated else a.title }} — {{ a.author_name }} · chuhainews">
 {% if divider %}<div class="divider mono xs up red">{{ divider }}</div>{% endif %}
 <header class="art-hd">
 <span class="mono xs up mute"><a href="/c/{{ a.cat }}" class="plain">{{ a.cat_name }}</a> — {{ a.mins }} {{ t.min }} — {{ a.lang_label }} — <time datetime="{{ a.published_at }}">{{ a.date_label }}</time></span>
@@ -13,6 +14,8 @@
 </div>
 </header>
 {% if a.summary %}<aside class="intro" aria-label="{{ t.introLabel }}"><span class="mono xs up red">{{ t.introLabel }}</span><p>{{ a.summary }}</p></aside>{% endif %}
+{% if a.editor_take %}<section class="intro editorial-take"><h2 class="mono xs up red">{{ t.editorTake }}</h2><span class="mono xs mute">{% if editor %}<a href="/about#editor">{{ editor.name }}</a>{% else %}chuhainews {{ '编辑部' if ui == 'zh' else 'editorial team' }}{% endif %}</span>{% for paragraph in a.editor_take.split('\n\n') %}{% if paragraph.strip() %}<p>{{ paragraph }}</p>{% endif %}{% endfor %}</section>{% endif %}
+{% if a.license_status == 'granted' and a.license_proof %}<p class="mono xs mute">{{ t.licensed }}</p>{% endif %}
 <div class="art-body" data-body>
 {% set tl = 'zh' if a.lang == 'en' else 'en' %}
 {% for p in a.paras %}{% set kind = p[2] if p | length > 2 else 'p' %}

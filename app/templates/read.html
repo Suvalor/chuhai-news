@@ -9,7 +9,7 @@
 <button type="button" class="on" data-ctx="author">{{ t.sameAuthor }}</button><button type="button" data-ctx="cat">{{ t.sameCat }}</button>
 </div>
 <div class="sp"></div>
-{% if a.has_trans %}<button type="button" class="trans-btn" data-trans aria-pressed="false"><span>{{ t.transShort }}</span><span class="track"><span class="knob"></span></span></button>{% endif %}
+<button type="button" class="trans-btn" data-trans aria-pressed="{{ 'true' if a.has_trans and a.lang != ui else 'false' }}"{{ ' hidden' if not a.has_trans }}><span data-trans-label data-original="{{ t.originalSwitch }}" data-translation="{{ t.transShort }}">{{ t.originalSwitch if a.has_trans and a.lang != ui else t.transShort }}</span><span class="track"><span class="knob"></span></span></button>
 </div>
 <div class="progress" aria-hidden="true"><i data-progress></i></div>
 </header>

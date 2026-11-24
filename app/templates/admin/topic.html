@@ -1,14 +1,14 @@
 {% extends "admin/base.html" %}{% block title %}{{ tp.title }}{% endblock %}{% block main %}
-<h1>编辑专题 <span class="mono mute">/t/{{ tp.key }}</span></h1>
-{% if error %}<p class="msg">{{ error }}</p>{% elif request.query_params.get('saved') %}<p class="msg ok">已保存。{% if tp.status == 'published' %}<a href="/t/{{ tp.key }}" target="_blank">在前台查看 ↗</a>{% endif %}</p>{% endif %}
+<h1>编辑专题 <span class="mono mute">{{ topic_path(tp.key) }}</span></h1>
+{% if error %}<p class="msg">{{ error }}</p>{% elif request.query_params.get('saved') %}<p class="msg ok">已保存。{% if tp.status == 'published' %}<a href="{{ topic_path(tp.key) }}" target="_blank">在前台查看 ↗</a>{% endif %}</p>{% endif %}
 <form method="post" action="/admin/topics/{{ tp.key }}">
 <div class="grid">
 <label class="span2">标题<input name="title" value="{{ tp.title }}" required maxlength="200"></label>
 <label>状态<select name="status">{% for s in statuses %}<option value="{{ s }}" {{ 'selected' if tp.status == s }}>{{ '已发布' if s == 'published' else '草稿' }}</option>{% endfor %}</select></label>
 <label>排序（小的在前）<input name="sort" type="number" value="{{ tp.sort }}"></label>
-<label class="span4">导语（这个专题解决什么问题、为什么选这些文章；首句会进首页和 llms.txt）<textarea name="intro" maxlength="1000" rows="3" style="min-height:0">{{ tp.intro }}</textarea></label>
+<label class="span4">导语（先写直接结论、分步要点，再说明为什么选这些文章；周报填写趋势总结，月报填写观察与边界；首句会进首页和 llms.txt）<textarea name="intro" maxlength="1000" rows="3" style="min-height:0">{{ tp.intro }}</textarea></label>
 </div>
-<p class="mute">文章一行一篇，按想让读者读的顺序排：<code>slug | 入选理由</code>。slug 也可以直接贴文章网址。入选理由可省略。下架的文章会自动不显示。</p>
+<p class="mute">文章一行一篇，按想让读者读的顺序排：<code>slug | 入选理由</code>。slug 也可以直接贴文章网址。普通专题的入选理由可省略；周报/月报必须填写每篇的编辑判断与适用人群。下架的文章会自动不显示。</p>
 <label>文章<textarea name="items" placeholder="notes-on-taste | 先读这篇：把「品味」拆成可练的动作">{{ text }}</textarea></label>
 <div class="bar" style="margin-top:16px"><button>保存</button><a class="btn ghost" href="/admin/topics">返回列表</a></div>
 </form>
