@@ -42,6 +42,40 @@ CREATE TABLE IF NOT EXISTS webhook_nonces (sig TEXT PRIMARY KEY, ts INTEGER NOT 
 CREATE TABLE IF NOT EXISTS webhook_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, ok INTEGER NOT NULL,
   status INTEGER NOT NULL, message TEXT DEFAULT '', external_ids TEXT DEFAULT '');
+
+CREATE TABLE IF NOT EXISTS geo_questions (
+ id INTEGER PRIMARY KEY, question_key TEXT NOT NULL, text TEXT NOT NULL, lang TEXT NOT NULL,
+ type TEXT NOT NULL, keyword TEXT DEFAULT '', expect_path TEXT DEFAULT '', version INTEGER NOT NULL DEFAULT 1,
+ active INTEGER NOT NULL DEFAULT 1, UNIQUE(question_key,version));
+CREATE TABLE IF NOT EXISTS geo_competitors (
+ domain TEXT PRIMARY KEY, name TEXT NOT NULL, note TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'confirmed');
+CREATE TABLE IF NOT EXISTS geo_runs (
+ id INTEGER PRIMARY KEY, started_at TEXT NOT NULL, finished_at TEXT, trigger TEXT NOT NULL,
+ source TEXT NOT NULL DEFAULT 'api', status TEXT NOT NULL DEFAULT 'queued', calls INTEGER NOT NULL DEFAULT 0,
+ expected INTEGER NOT NULL DEFAULT 0, cost_est REAL NOT NULL DEFAULT 0, note TEXT DEFAULT '');
+CREATE UNIQUE INDEX IF NOT EXISTS geo_one_running ON geo_runs(status) WHERE status='running';
+CREATE TABLE IF NOT EXISTS geo_results (
+ id INTEGER PRIMARY KEY, run_id INTEGER NOT NULL REFERENCES geo_runs(id), question_id INTEGER NOT NULL REFERENCES geo_questions(id),
+ platform TEXT NOT NULL, model TEXT DEFAULT '', region TEXT DEFAULT '', web_search INTEGER DEFAULT 0, repeat_no INTEGER NOT NULL,
+ status TEXT NOT NULL, answer_raw TEXT DEFAULT '', answer_text TEXT DEFAULT '', brand_hit INTEGER DEFAULT 0,
+ recommended INTEGER DEFAULT 0, rank_pos INTEGER, accuracy TEXT DEFAULT '', judged_by TEXT DEFAULT '',
+ entity_confusion INTEGER DEFAULT 0, error TEXT DEFAULT '', created_at TEXT NOT NULL,
+ UNIQUE(run_id,question_id,platform,repeat_no));
+CREATE TABLE IF NOT EXISTS geo_citations (
+ result_id INTEGER NOT NULL REFERENCES geo_results(id), url TEXT NOT NULL, domain TEXT NOT NULL,
+ is_self INTEGER NOT NULL, page_type TEXT DEFAULT '', competitor TEXT DEFAULT '', order_no INTEGER NOT NULL,
+ PRIMARY KEY(result_id,url));
+CREATE TABLE IF NOT EXISTS geo_events (id INTEGER PRIMARY KEY,date TEXT NOT NULL,kind TEXT NOT NULL,note TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS ai_referrals (date TEXT NOT NULL,source TEXT NOT NULL,path TEXT NOT NULL,uv INTEGER NOT NULL,PRIMARY KEY(date,source,path));
+CREATE TABLE IF NOT EXISTS crawler_weekly (week TEXT NOT NULL,bot TEXT NOT NULL,requests INTEGER NOT NULL,PRIMARY KEY(week,bot));
+CREATE TABLE IF NOT EXISTS geo_index_weekly (week TEXT NOT NULL,engine TEXT NOT NULL,checked INTEGER NOT NULL,indexed INTEGER NOT NULL,sitemap_total INTEGER NOT NULL,note TEXT DEFAULT '',PRIMARY KEY(week,engine));
+CREATE TABLE IF NOT EXISTS geo_tasks (
+ id INTEGER PRIMARY KEY, question_id INTEGER REFERENCES geo_questions(id), path TEXT DEFAULT '',
+ kind TEXT NOT NULL, priority TEXT NOT NULL, note TEXT NOT NULL, status TEXT DEFAULT 'open',
+ updated_at TEXT NOT NULL, UNIQUE(question_id,kind));
+CREATE UNIQUE INDEX IF NOT EXISTS geo_maintenance_path ON geo_tasks(path) WHERE kind='maintenance';
+CREATE INDEX IF NOT EXISTS geo_result_run ON geo_results(run_id,question_id,platform);
+CREATE INDEX IF NOT EXISTS geo_citation_domain ON geo_citations(domain);
 """
 
 DEFAULT_CATS = [
@@ -51,6 +85,20 @@ DEFAULT_CATS = [
     ("tool", "工具", "Tools", "拿来就用：软件、清单与模板", "Use it now: software, lists, templates"),
     ("global", "出海", "Global", "走出去：本地化与海外市场", "Go global: localization, new markets"),
     ("create", "创作", "Creating", "写出来：长文、Thread 与个人品牌", "Create: long-form, threads, audience"),
+]
+
+GEO_COMPETITORS = [("xzhishu.com","X指数榜"),("xread.page","xread"),("xnews.qiaomu.ai","X News"),("aieii.com","AIEII"),("xreads.info","XReads")]
+GEO_QUESTIONS = [
+ ("q01","有没有不用刷推特、用中文读海外好文章的网站？","zh","position","海外长文","/"),
+ ("q02","哪里可以看 X 热门长文？","zh","category","X 热门长文","/rank"),
+ ("q03","哪里可以集中阅读海外 AI 实战经验和工具文章？","zh","category","AI 实战","/c/ai"),
+ ("q04","有哪些适合中国独立开发者阅读的出海资讯网站？","zh","position","独立开发者","/c/global"),
+ ("q05","企业怎么搭 AI 知识库，让 Agent 持续学习？","zh","problem","AI 知识库","/c/ai"),
+ ("q06","海外 SaaS 冷启动如何找到第一批用户？","zh","problem","冷启动","/c/global"),
+ ("q07","如何设计稳定的 AI Agent 工作流？","zh","problem","Agent 工作流","/c/ai"),
+ ("q08","哪里能看海外创作者分享的内容创作经验？","zh","category","内容创作","/c/create"),
+ ("q09","Where can I read the best long posts from X in one place?","en","english","X long posts","/"),
+ ("q10","Where can I read top X long-form posts in Chinese?","en","english","Chinese translations","/"),
 ]
 
 # 热度：互动加权后按天数线性衰减；展示时再按全站最高分归一到 0–100
@@ -86,6 +134,8 @@ def init():
         con.executemany(
             "INSERT OR IGNORE INTO categories(key,zh,en,tag_zh,tag_en,sort) VALUES (?,?,?,?,?,?)",
             [(*c, i) for i, c in enumerate(DEFAULT_CATS)])
+        con.executemany("INSERT OR IGNORE INTO geo_competitors(domain,name) VALUES (?,?)", GEO_COMPETITORS)
+        con.executemany("INSERT OR IGNORE INTO geo_questions(question_key,text,lang,type,keyword,expect_path) VALUES (?,?,?,?,?,?)", GEO_QUESTIONS)
 
 
 def _row(r):
@@ -401,3 +451,84 @@ def update_category(key, zh, en, tag_zh, tag_en, sort):
     with connect() as con:
         con.execute("UPDATE categories SET zh=?, en=?, tag_zh=?, tag_en=?, sort=? WHERE key=?",
                     (zh, en, tag_zh, tag_en, sort, key))
+
+
+# ---------- GEO monitor (internal only) ----------
+def geo_read(sql, args=()):
+    with connect() as con:
+        return [dict(r) for r in con.execute(sql, args)]
+
+
+def geo_write(sql, args=()):
+    with connect() as con:
+        return con.execute(sql, args).lastrowid
+
+
+def geo_referral_count(day, source, path, uv):
+    # Same-process writes are absolute snapshots; after restart retain the larger
+    # value rather than add potentially duplicated visitors. Lower bound only.
+    with connect() as con:
+        con.execute("""INSERT INTO ai_referrals VALUES (?,?,?,?)
+                       ON CONFLICT(date,source,path) DO UPDATE SET uv=max(uv,excluded.uv)""",
+                    (day, source, path, uv))
+
+
+def geo_question(key, text, lang, kind, keyword, path, active=True):
+    with connect() as con:
+        con.execute("BEGIN IMMEDIATE")
+        old = con.execute("SELECT * FROM geo_questions WHERE question_key=? ORDER BY version DESC LIMIT 1", (key,)).fetchone()
+        vals = (text, lang, kind, keyword, path)
+        if old and tuple(old[k] for k in ("text","lang","type","keyword","expect_path")) == vals:
+            con.execute("UPDATE geo_questions SET active=? WHERE id=?", (int(active),old["id"]))
+            return old["id"]
+        con.execute("UPDATE geo_questions SET active=0 WHERE question_key=?", (key,))
+        return con.execute("INSERT INTO geo_questions(question_key,text,lang,type,keyword,expect_path,version,active) VALUES (?,?,?,?,?,?,?,?)",
+                           (key,*vals,old["version"]+1 if old else 1,int(active))).lastrowid
+
+
+def geo_enqueue(trigger="manual"):
+    with connect() as con:
+        con.execute("BEGIN IMMEDIATE")
+        old = con.execute("SELECT id FROM geo_runs WHERE source='api' AND status IN ('queued','running') ORDER BY id LIMIT 1").fetchone()
+        if old:
+            return old["id"]
+        return con.execute("INSERT INTO geo_runs(started_at,trigger) VALUES (?,?)",(now_iso(),trigger)).lastrowid
+
+
+def geo_claim():
+    with connect() as con:
+        con.execute("BEGIN IMMEDIATE")
+        if con.execute("SELECT 1 FROM geo_runs WHERE status='running'").fetchone():
+            return None
+        row = con.execute("SELECT id FROM geo_runs WHERE status='queued' AND source='api' ORDER BY id LIMIT 1").fetchone()
+        if not row:
+            return None
+        con.execute("UPDATE geo_runs SET status='running',started_at=? WHERE id=?",(now_iso(),row["id"]))
+        return row["id"]
+
+
+def geo_reserve(run, amount, limit, max_calls):
+    with connect() as con:
+        con.execute("BEGIN IMMEDIATE")
+        return con.execute("""UPDATE geo_runs SET calls=calls+1,cost_est=cost_est+?
+          WHERE id=? AND status='running' AND calls<? AND cost_est+?<=?""",
+                           (amount,run,max_calls,amount,limit)).rowcount == 1
+
+
+def geo_store(result, citations):
+    with connect() as con:
+        cols = ("run_id","question_id","platform","model","region","web_search","repeat_no","status",
+                "answer_raw","answer_text","brand_hit","recommended","rank_pos","accuracy","judged_by","entity_confusion","error","created_at")
+        vals = [result.get(k, None if k=="rank_pos" else 0 if k in ("web_search","brand_hit","recommended","entity_confusion") else "") for k in cols]
+        con.execute("INSERT OR IGNORE INTO geo_results("+",".join(cols)+") VALUES ("+",".join("?" for _ in cols)+")", vals)
+        rid = con.execute("SELECT id FROM geo_results WHERE run_id=? AND question_id=? AND platform=? AND repeat_no=?",
+                          (result["run_id"],result["question_id"],result["platform"],result["repeat_no"])).fetchone()["id"]
+        for i,c in enumerate(citations,1):
+            con.execute("INSERT OR IGNORE INTO geo_citations VALUES (?,?,?,?,?,?,?)",
+                        (rid,c["url"],c["domain"],c["is_self"],c["page_type"],c["competitor"],i))
+            if not c["is_self"] and c["domain"]:
+                # Only surface recurring unknown domains, not every one-off result.
+                n=con.execute("SELECT COUNT(DISTINCT result_id) FROM geo_citations WHERE domain=?", (c["domain"],)).fetchone()[0]
+                if n>=2:
+                    con.execute("INSERT OR IGNORE INTO geo_competitors(domain,name,status) VALUES (?,?,'pending')",(c["domain"],c["domain"]))
+        return rid

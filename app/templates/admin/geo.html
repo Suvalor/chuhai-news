@@ -1,0 +1,73 @@
+{% extends "admin/base.html" %}
+{% block title %}GEO Monitor{% endblock %}
+{% block main %}
+<style>
+.geo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin:16px 0}
+.geo-card{padding:16px;border:1px solid var(--line);background:white;border-radius:8px;min-width:0}
+.geo-card strong{display:block;font-size:21px;margin-top:5px;overflow-wrap:anywhere}
+.geo-panel{margin:26px 0;border:1px solid var(--line);padding:16px;border-radius:8px;overflow:auto}
+.geo-panel h2{font-size:19px;margin:0 0 12px}
+.geo-panel summary{cursor:pointer;overflow-wrap:anywhere}.geo-panel details{margin:8px 0}
+.geo-panel textarea{min-height:80px}.geo-panel pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.geo-panel .grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));align-items:end}
+.geo-panel td{overflow-wrap:anywhere;max-width:460px}.geo-panel input[type=checkbox]{width:auto}
+.geo-panel .check{flex-direction:row;align-items:center}.geo-panel button{width:max-content}
+.geo-run-select{max-width:480px}.geo-muted{font-size:12px;color:var(--mute)}
+@media(max-width:700px){main{padding:16px}.top{height:auto;flex-wrap:wrap;padding:12px;gap:8px}.top nav{flex-wrap:wrap;gap:10px}}
+</style>
+<h1>GEO Monitor</h1>
+<p class="mute">内部监测 · API 与网页人工样本分开 · 比率仅以 success 为分母，n &lt; 20 不显示百分比。未采集不是零。</p>
+<div class="bar">
+<form action="/admin/geo/run" method="post"><button>登记立即运行</button></form>
+<span class="badge {{ 'published' if enabled else '' }}">{{ '执行器已启用' if enabled else '执行器默认关闭' }}</span>
+<span class="mute">网页只登记队列，不调用付费 API。</span>
+</div>
+{% if runs %}
+<form method="get" class="bar"><label class="geo-run-select">运行记录<select name="run_id">{% for r in runs %}<option value="{{ r.id }}" {% if run and r.id==run.id %}selected{% endif %}>#{{ r.id }} · {{ r.started_at }} · {{ r.source }} · {{ r.status }}</option>{% endfor %}</select></label><button class="ghost">查看</button></form>
+{% endif %}
+{% if run %}<p class="mono">#{{ run.id }} · {{ run.status }} · 已发请求 {{ run.calls }} · 应跑 {{ run.expected }} · 预算预留 ${{ '%.4f'|format(run.cost_est) }} · {{ run.note }}</p>{% else %}<p class="mute">尚无已完成监测。先录入人工基线，或在成本确认后启用执行器。</p>{% endif %}
+<div class="geo-grid">
+<div class="geo-card">启用题库<strong>{{ questions|selectattr('active')|list|length }}</strong></div>
+<div class="geo-card">采样平台<strong>{{ rows|map(attribute='platform')|unique|list|length if rows else '—' }}</strong></div>
+<div class="geo-card">品牌提及<strong>{{ stats.brand if run else '待采集' }}</strong></div>
+<div class="geo-card">正文推荐<strong>{{ stats.recommend if run else '待采集' }}</strong></div>
+<div class="geo-card">内容引用<strong>{{ stats.citation if run else '待采集' }}</strong></div>
+<div class="geo-card">有效样本 / 成功率<strong>{{ stats.success if run else '待采集' }}</strong></div>
+<div class="geo-card">平均推荐位置<strong>{{ stats.rank }}</strong></div>
+<div class="geo-card">AI 导流 UV（下限，最近记录）<strong>{{ referrals[0].uv if referrals else '待采集' }}</strong><span class="geo-muted">{{ referrals[0].date ~ ' / ' ~ referrals[0].source ~ ' / ' ~ referrals[0].path if referrals else '按天、来源、首次落地页' }}</span></div>
+<div class="geo-card">爬虫抓取（最近记录）<strong>{{ crawlers[0].requests if crawlers else '待录入' }}</strong><span class="geo-muted">{{ crawlers[0].week ~ ' / ' ~ crawlers[0].bot if crawlers else 'Cloudflare 每周记录' }}</span></div>
+</div>
+<section class="geo-panel"><h2>可比趋势（同题目版本、同平台、同采集来源）</h2>
+<table><thead><tr><th>时间 / 轮次</th><th>品牌提及</th><th>正文推荐</th><th>内容引用</th><th>成功率</th></tr></thead><tbody>
+{% for h in history %}<tr><td>{{ h.run.started_at }} / #{{ h.run.id }}</td><td>{{ h.brand }}</td><td>{{ h.recommend }}</td><td>{{ h.citation }}</td><td>{{ h.success }}</td></tr>{% else %}<tr><td colspan="5">暂无可比数据</td></tr>{% endfor %}</tbody></table>
+{% if history %}<div style="max-width:720px" aria-label="可比轮次指标趋势">{% for h in history %}{% if h.n>=20 %}<div style="margin:12px 0"><b>{{ h.run.started_at[:10] }} / #{{ h.run.id }} (n={{ h.n }})</b>{% for label,value in [('提及',h.brand_pct),('推荐',h.recommend_pct),('引用',h.citation_pct)] %}<div class="geo-muted">{{ label }} <meter min="0" max="100" value="{{ value }}" style="width:60%;max-width:380px"></meter> {{ '%.1f'|format(value) }}%</div>{% endfor %}</div>{% endif %}{% endfor %}</div>{% endif %}
+<p class="geo-muted">事件用于对照，不把相关性当因果；至少观察后续两轮。API 与真实产品体验不完全一致，月度人工校准后再解释。</p>
+{% for e in events %}<p>{{ e.date }} · {{ e.kind }} · {{ e.note }}</p>{% endfor %}
+<form method="post" action="/admin/geo/event" class="grid"><label>事件日期<input type="date" name="day" required></label><label>事件类型<input name="kind" required placeholder="改标题 / 上线专题 / 授权"></label><label>事件内容<input name="note" required></label><button>记录</button></form></section>
+<section class="geo-panel"><h2>按平台 × 题型 × 语言 × 版本</h2>
+<table><thead><tr><th>分组</th><th>提及</th><th>推荐</th><th>引用</th><th>成功率</th><th>平均位置</th></tr></thead><tbody>
+{% for g in groups %}<tr><td>{{ g.key|join(' / ') }}</td><td>{{ g.brand }}</td><td>{{ g.recommend }}</td><td>{{ g.citation }}</td><td>{{ g.success }}</td><td>{{ g.rank }}</td></tr>{% else %}<tr><td colspan="6">暂无样本</td></tr>{% endfor %}</tbody></table>
+</section>
+<section class="geo-panel"><h2>人工校准与复核</h2><p>当月抽 5 题，每平台人工网页问一次，通过 CSV 导入；以相同题目版本与 API 三次多数命中比较。域名重合使用交并比。</p><table><thead><tr><th>平台</th><th>匹配题数</th><th>品牌一致</th><th>引用域名重合</th><th>提示</th></tr></thead><tbody>{% for c in calibration %}<tr><td>{{ c.platform }}</td><td>{{ c.n }}</td><td>{{ c.agreement }}</td><td>{{ c.overlap }}</td><td>{{ 'API 结果仅供参考' if c.warning else '本月抽检一致' }}</td></tr>{% else %}<tr><td colspan="5">待人工采集</td></tr>{% endfor %}</tbody></table><p>本轮已判答案 10% 稳定抽样：人工复核 {{ review_done }}/{{ review_required }}。待复核条目标记在下方。</p></section>
+<section class="geo-panel"><h2>题目与完整回答</h2>
+{% for r in rows %}<details><summary>{{ r.question_key }} v{{ r.version }} · {{ r.platform }} #{{ r.repeat_no }} · {{ r.status }} · {% if r.review_sample %}<b>{{ '已人工复核' if r.judged_by=='human' else '待人工抽检' }}</b> · {% endif %}{% if r.recommended %}✓ 正文推荐{% elif r.citations|selectattr('is_self')|list %}仅引用{% elif r.brand_hit %}仅提及{% else %}未命中{% endif %} · {{ r.text }}</summary>
+<p class="mono">{{ r.model }} · {{ r.region }} · {{ r.error }} · 准确性 {{ r.accuracy or '未判' }} {{ r.judged_by }}{% if r.entity_confusion %} · entity_confusion{% endif %}</p>
+<pre>{{ r.answer_text }}</pre><p>引用：</p><ul>{% for c in r.citations %}<li>{{ c.url }} · {{ c.page_type }} · {{ c.competitor }}</li>{% endfor %}</ul><details><summary>完整响应 JSON</summary><pre>{{ r.answer_raw }}</pre></details>
+{% if r.status=='success' %}<form method="post" action="/admin/geo/review" class="grid"><input type="hidden" name="result_id" value="{{ r.id }}"><label>人工判定<select name="accuracy">{% for a in ['unknown','accurate','partial','wrong'] %}<option {% if a==r.accuracy %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></label><label class="check"><input type="checkbox" name="confusion" value="true" {% if r.entity_confusion %}checked{% endif %}>实体混淆</label><label class="check"><input type="checkbox" name="recommended" value="true" {% if r.recommended %}checked{% endif %}>正文推荐</label><label>推荐位置<input name="rank" type="number" min="0" value="{{ r.rank_pos or 0 }}"></label><button>保存复核</button></form>{% endif %}</details>{% else %}<p>暂无回答。</p>{% endfor %}
+</section>
+<section class="geo-panel"><h2>竞品频次与待确认竞品</h2>
+{% for c in competitors %}<details><summary>{{ c.name }} · {{ c.domain }} · {{ c.status }} · {{ c.frequency }}</summary>
+<form method="post" action="/admin/geo/competitor" class="grid"><input type="hidden" name="domain" value="{{ c.domain }}"><label>名称<input name="name" value="{{ c.name }}" required></label><label>备注<input name="note" value="{{ c.note }}"></label><label>状态<select name="status">{% for s in ['confirmed','pending','ignored'] %}<option {% if s==c.status %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label><button>保存</button></form></details>{% endfor %}
+<form method="post" action="/admin/geo/competitor" class="grid"><label>域名<input name="domain" required></label><label>名称<input name="name" required></label><label>备注<input name="note"></label><button>新增竞品</button></form>
+</section>
+<section class="geo-panel"><h2>被引用页面</h2><table><thead><tr><th>URL</th><th>类型</th><th>引用次数</th></tr></thead><tbody>{% for pair,n in pages %}<tr><td>{{ pair[0] }}</td><td>{{ pair[1] }}</td><td>{{ n }}</td></tr>{% else %}<tr><td colspan="3">暂无引用</td></tr>{% endfor %}</tbody></table></section>
+<section class="geo-panel"><h2>内容任务 / 选题观察 / 优先维护</h2>{% for task in tasks %}<form method="post" action="/admin/geo/task" class="bar"><input type="hidden" name="task_id" value="{{ task.id }}"><span>{{ task.priority }} · {{ task.kind }} · {{ task.note }}</span><label>状态<select name="status">{% for s in ['open','done','dismissed'] %}<option {% if s==task.status %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label><button class="ghost">更新</button></form>{% else %}<p>等待有效样本。</p>{% endfor %}</section>
+<section class="geo-panel"><h2>导流 UV · 按日去重（下限）</h2><p class="geo-muted">无 Referer / UTM 不计，进程重启保守覆盖；同平台每日首次落地页，跨平台不能相加当全站独立访客。</p><table><thead><tr><th>日期</th><th>来源</th><th>落地页</th><th>UV</th></tr></thead><tbody>{% for a in referrals %}<tr><td>{{ a.date }}</td><td>{{ a.source }}</td><td>{{ a.path }}</td><td>{{ a.uv }}</td></tr>{% else %}<tr><td colspan="4">尚无命中记录</td></tr>{% endfor %}</tbody></table></section>
+<section class="geo-panel"><h2>搜索爬虫周度抓取（Cloudflare）</h2><form method="post" action="/admin/geo/crawler" class="grid"><label>ISO 周<input name="week" placeholder="2026-W48" required></label><label>爬虫<select name="bot">{% for b in bots %}<option>{{ b }}</option>{% endfor %}</select></label><label>请求数<input name="requests" type="number" min="0" required></label><button>记录 / 覆盖</button></form>
+<table><thead><tr><th>周</th><th>Bot</th><th>请求数</th></tr></thead><tbody>{% for r in crawlers %}<tr><td>{{ r.week }}</td><td>{{ r.bot }}</td><td>{{ r.requests }}</td></tr>{% else %}<tr><td colspan="3">待人工录入</td></tr>{% endfor %}</tbody></table></section>
+<section class="geo-panel"><h2>搜索收录率（GSC / Bing）</h2><form method="post" action="/admin/geo/index" class="grid"><label>ISO 周<input name="week" placeholder="2026-W48" required></label><label>引擎<select name="engine"><option>google</option><option>bing</option></select></label><label>已检查<input name="checked" type="number" min="0" required></label><label>已收录<input name="indexed" type="number" min="0" required></label><label>Sitemap 总数<input name="total" type="number" min="0" required></label><label>口径备注<input name="note"></label><button>记录 / 覆盖</button></form><table><thead><tr><th>周</th><th>引擎</th><th>样本收录 / 检查</th><th>Sitemap 总数</th><th>备注</th></tr></thead><tbody>{% for r in indexing %}<tr><td>{{ r.week }}</td><td>{{ r.engine }}</td><td>{{ r.indexed }}/{{ r.checked }}{% if r.checked>=20 %} ({{ '%.1f'|format(100*r.indexed/r.checked) }}%){% endif %}{% if r.checked!=r.sitemap_total %} · 抽样{% endif %}</td><td>{{ r.sitemap_total }}</td><td>{{ r.note }}</td></tr>{% else %}<tr><td colspan="5">待验证 / 录入</td></tr>{% endfor %}</tbody></table></section>
+<section class="geo-panel"><h2>题库与历史版本</h2>
+{% for q in questions %}<details><summary>{{ q.question_key }} v{{ q.version }} · {{ '启用' if q.active else '停用' }} · {{ q.text }}</summary>{% if loop.first or questions[loop.index0-1].question_key!=q.question_key %}<form method="post" action="/admin/geo/question" class="grid"><input type="hidden" name="key" value="{{ q.question_key }}"><label>问题<input name="text" value="{{ q.text }}" required></label><label>语言<select name="lang"><option {% if q.lang=='zh' %}selected{% endif %}>zh</option><option {% if q.lang=='en' %}selected{% endif %}>en</option></select></label><label>题型<select name="kind">{% for k in ['position','category','problem','english'] %}<option {% if k==q.type %}selected{% endif %}>{{ k }}</option>{% endfor %}</select></label><label>关键词<input name="keyword" value="{{ q.keyword }}"></label><label>期望页面<input name="path" value="{{ q.expect_path }}"></label><label class="check"><input type="checkbox" name="active" value="true" {% if q.active %}checked{% endif %}>启用</label><button>保存（改题升版）</button></form>{% endif %}</details>{% endfor %}
+<h3>新增题目</h3><form method="post" action="/admin/geo/question" class="grid"><label>题号<input name="key" required></label><label>问题<input name="text" required></label><label>语言<select name="lang"><option>zh</option><option>en</option></select></label><label>题型<select name="kind">{% for k in ['position','category','problem','english'] %}<option>{{ k }}</option>{% endfor %}</select></label><label>关键词<input name="keyword"></label><label>期望页面<input name="path"></label><label class="check"><input type="checkbox" name="active" value="true" checked>启用</label><button>新增</button></form></section>
+<section class="geo-panel"><h2>运行记录</h2><table><thead><tr><th>编号</th><th>来源</th><th>状态</th><th>请求 / 应跑</th><th>预留 USD</th><th>备注</th></tr></thead><tbody>{% for r in runs %}<tr><td><a href="/admin/geo?run_id={{ r.id }}">#{{ r.id }}</a></td><td>{{ r.source }}</td><td>{{ r.status }}</td><td>{{ r.calls }} / {{ r.expected }}</td><td>{{ '%.4f'|format(r.cost_est) }}</td><td>{{ r.note }}</td></tr>{% else %}<tr><td colspan="6">暂无运行</td></tr>{% endfor %}</tbody></table></section>
+{% endblock %}
