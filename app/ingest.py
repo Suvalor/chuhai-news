@@ -11,7 +11,6 @@ from . import db, indexnow
 SCHEMA = json.loads((Path(__file__).parent / "webhook_schema.json").read_text())
 
 LANGS = ("en", "zh")
-MAX_PARAS = 1000  # 长 X Article 会切出 400+ 段（2026-11-21 实测 468 段）
 MAX_TEXT = 20000
 
 
@@ -124,8 +123,6 @@ def normalize(raw):
                             _s(raw.get("body_translated"), "body_translated", max_len=200000))
     if not paras:
         raise ValueError("正文为空")
-    if len(paras) > MAX_PARAS:
-        raise ValueError(f"段落过多（上限 {MAX_PARAS}）")
 
     pub = _s(raw.get("published_at"), "published_at", max_len=40)
     if pub:
