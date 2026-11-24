@@ -16,7 +16,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
-from . import db, importer, indexnow, limits
+from . import db, geo, importer, indexnow, limits
+from starlette.concurrency import run_in_threadpool
+import logging
 from .i18n import HOT_QUERIES, T, count, fmt
 from .ingest import SCHEMA as WEBHOOK_SCHEMA, BatchError, publish
 from .limits import client_ip
@@ -46,6 +48,19 @@ async def lifespan(app):
 
 app = FastAPI(title="chuhainews", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+
+
+@app.middleware("http")
+async def geo_referral(request, call_next):
+    response = await call_next(request)
+    if request.method == "GET" and response.status_code == 200 and response.headers.get("content-type","").startswith("text/html"):
+        try:
+            await run_in_threadpool(geo.track, request)
+        except Exception:
+            # Analytics must never prevent public reading or expose visitor details.
+            logging.getLogger("chuhai.geo").warning("AI referral collection failed")
+    return response
+
 # MCP Streamable HTTP 端点直接挂到 /mcp（无状态 + JSON 响应，便于部署在任意反代后面）
 _mcp_app = mcp.streamable_http_app(streamable_http_path="/mcp", stateless_http=True, json_response=True,
                                    host=os.getenv("CHUHAI_BIND", "0.0.0.0"))

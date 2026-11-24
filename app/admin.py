@@ -9,7 +9,9 @@ from datetime import datetime
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from . import db, indexnow, limits
+from . import db, geo, indexnow, limits
+from fastapi import HTTPException
+from datetime import date
 from .ingest import block_text, join_blocks
 from .main import site_url, templates
 
@@ -352,3 +354,95 @@ def delete_topic(request: Request, key: str):
     if tp and tp["status"] == "published":
         ping(request, db.topic_path(key))
     return RedirectResponse("/admin/topics", 303)
+
+
+@router.get("/geo", response_class=HTMLResponse)
+def geo_dashboard(request: Request, run_id: int | None = None):
+    if (r := guard(request)):
+        return r
+    response=page(request,"geo.html",**geo.dashboard(run_id), enabled=os.getenv("GEO_ENABLED")=="1", platforms=geo.PLATFORMS,bots=geo.BOTS)
+    response.headers["Cache-Control"]="no-store"
+    return response
+
+
+def geo_back():
+    return RedirectResponse("/admin/geo",303)
+
+
+@router.post("/geo/run")
+def geo_queue(request: Request):
+    if (r := guard(request)): return r
+    db.geo_enqueue()
+    return geo_back()
+
+
+@router.post("/geo/question")
+def geo_save_question(request: Request, key: str=Form(...), text: str=Form(...), lang: str=Form(...),
+                      kind: str=Form(...),keyword: str=Form(""),path: str=Form(""),active: bool=Form(False)):
+    if (r := guard(request)): return r
+    if not re.fullmatch(r"[a-zA-Z0-9_-]{1,40}",key) or not text.strip() or len(text)>2000 or lang not in ("zh","en") or kind not in ("position","category","problem","english") or (path and (not path.startswith("/") or path.startswith("//") or len(path)>500)):
+        raise HTTPException(400,"invalid question")
+    db.geo_question(key,text.strip(),lang,kind,keyword[:200],path,active)
+    return geo_back()
+
+
+@router.post("/geo/competitor")
+def geo_save_competitor(request: Request,domain: str=Form(...),name: str=Form(...),note: str=Form(""),status: str=Form("confirmed")):
+    if (r := guard(request)): return r
+    domain=domain.lower().strip().removeprefix("www.")
+    if not re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)+",domain) or domain==geo.SELF or len(domain)>253 or not name.strip() or status not in ("confirmed","pending","ignored"):
+        raise HTTPException(400,"invalid competitor")
+    db.geo_write("INSERT INTO geo_competitors VALUES (?,?,?,?) ON CONFLICT(domain) DO UPDATE SET name=excluded.name,note=excluded.note,status=excluded.status",(domain,name[:200],note[:2000],status))
+    return geo_back()
+
+
+@router.post("/geo/event")
+def geo_save_event(request: Request, day: str=Form(...),kind: str=Form(...),note: str=Form(...)):
+    if (r := guard(request)): return r
+    try: day=date.fromisoformat(day).isoformat()
+    except ValueError: raise HTTPException(400,"invalid date")
+    if not kind.strip() or not note.strip(): raise HTTPException(400,"event is empty")
+    db.geo_write("INSERT INTO geo_events(date,kind,note) VALUES (?,?,?)",(day,kind[:100],note[:4000]))
+    return geo_back()
+
+
+def check_week(week):
+    try:
+        if not re.fullmatch(r"\d{4}-W\d{2}",week): raise ValueError()
+        year,number=map(int,week.split("-W")); date.fromisocalendar(year,number,1)
+    except ValueError: raise HTTPException(400,"invalid ISO week")
+
+
+@router.post("/geo/crawler")
+def geo_save_crawler(request: Request,week: str=Form(...),bot: str=Form(...),requests: int=Form(...)):
+    if (r := guard(request)): return r
+    check_week(week)
+    if bot not in geo.BOTS or not 0<=requests<=10**12: raise HTTPException(400,"invalid crawler count")
+    db.geo_write("INSERT INTO crawler_weekly VALUES (?,?,?) ON CONFLICT(week,bot) DO UPDATE SET requests=excluded.requests",(week,bot,requests))
+    return geo_back()
+
+
+@router.post("/geo/index")
+def geo_save_index(request: Request,week: str=Form(...),engine: str=Form(...),checked: int=Form(...),indexed: int=Form(...),total: int=Form(...),note: str=Form("")):
+    if (r := guard(request)): return r
+    check_week(week)
+    if engine not in ("google","bing") or not 0<=indexed<=checked<=total<=10**7: raise HTTPException(400,"invalid index sample")
+    db.geo_write("INSERT INTO geo_index_weekly VALUES (?,?,?,?,?,?) ON CONFLICT(week,engine) DO UPDATE SET checked=excluded.checked,indexed=excluded.indexed,sitemap_total=excluded.sitemap_total,note=excluded.note",(week,engine,checked,indexed,total,note[:2000]))
+    return geo_back()
+
+
+@router.post("/geo/review")
+def geo_review(request: Request,result_id: int=Form(...),accuracy: str=Form(...),confusion: bool=Form(False),recommended: bool=Form(False),rank: int=Form(0)):
+    if (r := guard(request)): return r
+    if accuracy not in ("accurate","partial","wrong","unknown") or rank<0 or rank>1000: raise HTTPException(400,"invalid review")
+    db.geo_write("UPDATE geo_results SET accuracy=?,judged_by='human',entity_confusion=?,recommended=?,rank_pos=? WHERE id=? AND status='success'",(accuracy,int(confusion),int(recommended),rank if recommended and rank else None,result_id))
+    rows=db.geo_read("SELECT run_id FROM geo_results WHERE id=?",(result_id,))
+    return RedirectResponse("/admin/geo?run_id="+str(rows[0]["run_id"]),303) if rows else geo_back()
+
+
+@router.post("/geo/task")
+def geo_task(request: Request,task_id: int=Form(...),status: str=Form(...)):
+    if (r := guard(request)): return r
+    if status not in ("open","done","dismissed"): raise HTTPException(400,"invalid task status")
+    db.geo_write("UPDATE geo_tasks SET status=?,updated_at=? WHERE id=?",(status,db.now_iso(),task_id))
+    return geo_back()
