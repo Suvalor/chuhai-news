@@ -73,7 +73,7 @@ JSON 结构：`{"site", "articles": [就绪的 WebHook 载荷], "report": [每�
 | `need_external_id` | 站上已有，但没给 `--existing-prefix`，或前缀和线上网址对不上（看 `warn`） | **问用户要前缀**（后台 WebHook 日志或文章编辑页里的 external_id 中，原帖 ID 之前的部分），拿到后重跑。不要猜，猜错会在线上多出一篇重复文章 |
 | `need_category` | 新文章没写类目 | 问用户，或按内容建议一个类目、经用户确认后写进链接行，再重跑 |
 | `skipped_short` | 原文字符数低于 `--min-chars` | 列给用户看。只有用户同意时，才用 `--min-chars 0` 重跑 |
-| `invalid` | 本地校验没过（如段落超过 1000） | 把 `result` 原样报告给用户 |
+| `invalid` | 本地校验没过（如图片地址不是 https） | 把 `result` 原样报告给用户 |
 | `failed` | 取文失败或翻译失败（如译文条数对不上） | 单独重跑这一篇。fxtwitter 长期失败就停下来报告，不要换成其他抓取方式 |
 
 **为了省 token，脚本先校验、后翻译**：凡是 `need_*`、`skipped_short`、`invalid` 状态的文章，都没有调用 DeepSeek，重跑不会重复花钱。已经 `ready_*` 的文章重跑时会再翻译一次，所以只重跑有问题的链接：新建一个只含这些链接的链接文件。

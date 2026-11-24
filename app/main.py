@@ -26,9 +26,11 @@ HERE = Path(__file__).resolve().parent
 PAGE = 30
 EXCEL_RATIO_PATH = "/tools/excel-ratio-converter"
 CJK = re.compile(r"[一-鿿]")
-AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "anthropic-ai",
-           "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot-Extended", "Bytespider", "CCBot",
-           "meta-externalagent", "Amazonbot", "DuckAssistBot", "cohere-ai", "MistralAI-User"]
+# AI 搜索与用户实时读取：放行，回答里会引用并链接本站。模型训练爬虫：禁止（只对守规矩的爬虫有效，硬拦截在 Cloudflare）
+AI_SEARCH_BOTS = ["OAI-SearchBot", "ChatGPT-User", "Claude-SearchBot", "Claude-User", "PerplexityBot", "Perplexity-User",
+                  "DuckAssistBot", "MistralAI-User"]
+AI_TRAINING_BOTS = ["GPTBot", "ClaudeBot", "anthropic-ai", "CCBot", "Bytespider", "Google-Extended", "Applebot-Extended",
+                    "meta-externalagent", "Amazonbot", "cohere-ai"]
 
 templates = Jinja2Templates(directory=HERE / "templates")
 # 静态文件网址带修改时间作版本号：文件一改网址就变，浏览器不会继续用缓存里的旧 CSS/JS
@@ -400,9 +402,10 @@ async def handle_404(request, exc):
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots(request: Request):
     base = site_url(request)
-    bots = "".join(f"User-agent: {b}\nAllow: /\n\n" for b in AI_BOTS)
-    return (f"# 允许所有爬虫，包括 AI 搜索与训练爬虫\nUser-agent: *\nAllow: /\n\n{bots}"
-            f"Sitemap: {base}/sitemap.xml\n# LLM 导航: {base}/llms.txt\n")
+    group = lambda bots, rule: "".join(f"User-agent: {b}\n" for b in bots) + rule + "\n\n"
+    return ("# 搜索引擎与 AI 搜索可以抓取和引用；模型训练爬虫不可抓取。原文版权归各作者所有。\n"
+            + group(["*"], "Allow: /") + group(AI_SEARCH_BOTS, "Allow: /") + group(AI_TRAINING_BOTS, "Disallow: /")
+            + f"Sitemap: {base}/sitemap.xml\n# LLM 导航: {base}/llms.txt\n")
 
 
 def xml_escape(s):
@@ -511,7 +514,7 @@ def to_markdown(a, base):
 def llms(request: Request):
     base = site_url(request)
     out = [f"# chuhainews", "", f"> {T['zh']['siteDesc']}", "> " + T["en"]["siteDesc"], "",
-           "每篇文章都有 Markdown 版本：在文章网址后加 `.md`。全文合集见 llms-full.txt。",
+           "每篇文章都有 Markdown 版本：在文章网址后加 `.md`。全部文章的导读见 llms-full.txt（不含正文）。",
            f"运营方、选文标准、翻译方式（AI 翻译，未逐篇校对）与版权联系：{base}/about",
            f"Agent 可通过 MCP（Streamable HTTP）查询：{base}/mcp", ""]
     out += ["## 实用工具 / Tools", "",
@@ -531,16 +534,22 @@ def llms(request: Request):
             note = first_sentence(a["summary"]) or a["title_t"]
             out.append(f"- [{a['title']}]({base}/a/{a['slug']}.md): {a['author_name']}" + (f" — {note}" if note else ""))
         out.append("")
-    out += ["## Optional", "", f"- [全文合集]({base}/llms-full.txt)", f"- [RSS]({base}/feed.xml)", f"- [Sitemap]({base}/sitemap.xml)"]
+    out += ["## Optional", "", f"- [全部文章导读]({base}/llms-full.txt)", f"- [RSS]({base}/feed.xml)", f"- [Sitemap]({base}/sitemap.xml)"]
     return "\n".join(out)
 
 
 @app.get("/llms-full.txt", response_class=PlainTextResponse)
 def llms_full(request: Request):
     base = site_url(request)
-    # shortcut: 一次拼出最近 200 篇全文；文章更多时改为分页或按类目拆文件
-    arts = [db.get_article(a["slug"]) for a in db.list_articles(sort="new", limit=200)]
-    return "\n\n".join(to_markdown(a, base) for a in arts if a)
+    # 只给导读和链接，不给正文：防止一次请求整站搬走；AI 搜索引用时读单篇 .md
+    out = ["# chuhainews — 全部文章导读", "", f"正文请读单篇：{base}/a/<slug>.md。原文版权归各作者所有。", ""]
+    for a in db.list_articles(sort="new", limit=500):
+        out += [f"## {a['title']}", ""] + ([f"> {a['title_t']}", ""] if a["title_t"] else [])
+        out += [f"- 作者 / Author: {a['author_name']} (@{a['author']})", f"- 发布 / Published: {a['published_at'][:10]}",
+                f"- 原帖 / Source: {a['source_url'] or '—'}", f"- 全文 / Full text: {base}/a/{a['slug']}.md", ""]
+        if a["summary"]:
+            out += [a["summary"], ""]
+    return "\n".join(out)
 
 
 @app.get("/{name}.txt", response_class=PlainTextResponse)

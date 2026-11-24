@@ -1,3 +1,4 @@
+import urllib.robotparser
 import hashlib
 import hmac
 import itertools
@@ -89,13 +90,18 @@ def test_pages(c):
 
 def test_seo_geo_endpoints(c):
     robots = c.get("/robots.txt").text
-    assert "User-agent: *\nAllow: /" in robots and "GPTBot" in robots and "Disallow" not in robots
+    assert "User-agent: *\nAllow: /" in robots
+    assert "User-agent: OAI-SearchBot\n" in robots and "User-agent: GPTBot\n" in robots
+    rp = urllib.robotparser.RobotFileParser()
+    rp.parse(robots.splitlines())
+    assert rp.can_fetch("OAI-SearchBot", "/a/x") and rp.can_fetch("Googlebot", "/a/x") and not rp.can_fetch("GPTBot", "/a/x")
     assert "https://chuhai.test/sitemap.xml" in robots
     sm = ET.fromstring(c.get("/sitemap.xml").content)
     assert "https://chuhai.test/a/notes-on-taste" in [e.text for e in sm.iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")]
     ET.fromstring(c.get("/feed.xml").content)
     assert "https://chuhai.test/a/notes-on-taste.md" in c.get("/llms.txt").text
-    assert "品味不是天赋。" in c.get("/llms-full.txt").text
+    full = c.get("/llms-full.txt").text  # 只有导读和链接，不给正文
+    assert "https://chuhai.test/a/notes-on-taste.md" in full and "品味不是天赋。" not in full
 
 
 def test_excel_ratio_converter_discovery(c):
