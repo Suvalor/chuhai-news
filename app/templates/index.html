@@ -51,15 +51,6 @@
 {% if page > 1 or has_more %}<nav class="pager mono sm">{% if page > 1 %}<a href="?page={{ page - 1 }}#rank" rel="prev">← {{ t.prev }}</a>{% endif %}<span class="sp"></span>{% if has_more %}<a href="?page={{ page + 1 }}#rank" rel="next">{{ t.nextPage }} →</a>{% endif %}</nav>{% endif %}
 </section>
 
-{% if authors %}
-<section class="wrap sec">
-<div class="sec-hd" data-rv><h2 class="mono xs up">{{ t.authorsLabel }}</h2><span class="hint">{{ t.authorsHint }}</span></div>
-<div class="s-authors home-au" data-rv>
-{% for a in authors %}<a href="/u/{{ a.handle }}" class="s-au"><span class="avatar sm" aria-hidden="true">{{ a.name[:1] | upper }}</span><b>{{ a.name }}</b><span class="mono xs">{{ count(a.n) }}</span></a>{% endfor %}
-</div>
-</section>
-{% endif %}
-
 {% if topics %}
 <section class="wrap sec">
 <div class="sec-hd" data-rv><h2 class="mono xs up">{{ t.topics }}</h2></div>
