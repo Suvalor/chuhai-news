@@ -410,7 +410,7 @@ def test_topics_admin_and_public(c):
                                               "status": "published", "sort": "0"})
     page = c.get("/t/pricing-101").text
     assert page.index("Pricing Is Positioning") < page.index("Notes on Taste") and "先读这篇：定价就是定位" in page
-    assert page.count('class="row"') == 2 and '"@type": "CollectionPage"' in page and 'class="sorts"' not in page
+    assert page.count('class="card" data-slug=') == 2 and '"@type": "CollectionPage"' in page and 'class="sorts"' not in page
     home = c.get("/").text
     assert 'href="/t/pricing-101"' in home
     assert home.index('class="wrap home-section home-feed"') < home.index('class="idx idx-topic"')

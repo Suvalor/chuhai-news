@@ -52,10 +52,21 @@ def test_home_collection_feed(tmp_path, monkeypatch):
         assert rank.index(f'href="/a/{old}"') < rank.index('href="/a/feed-31"')
         assert 'class="sorts"' in rank
         assert client.get("/?sort=views", follow_redirects=False).headers["location"] == "/rank?sort=views&page=1"
-        assert 'class="row"' in client.get("/c/ai").text
-        assert 'class="row"' in client.get("/u/writer").text
-        assert 'class="row"' in client.get("/search?q=Original").text
-        assert client.get("/saved").status_code == 200
+        assert 'class="row"' in rank  # 专用榜单布局不变
+        for path in ("/c/ai", "/u/writer", "/search?q=Original"):
+            page = client.get(path).text
+            assert 'class="card" data-slug=' in page
+            assert 'class="wrap home-nav"' in page and 'class="home-chip' in page
+            assert 'class="card-metrics mono"' in page
+            assert 'data-like=' in page and 'data-save=' in page
+            assert 'class="row"' not in page
+        category = client.get("/c/ai").text
+        assert 'href="/c/ai" class="home-chip on" aria-current="page"' in category
+        saved = client.get("/saved")
+        assert saved.status_code == 200 and 'class="card-list"' in saved.text
+        fragment = client.get("/fragment/rows?layout=cards&slugs=feed-0").text
+        assert 'class="card" data-slug="feed-0"' in fragment and 'data-save="feed-0"' in fragment
+        assert 'class="row"' in client.get("/fragment/rows?slugs=feed-0").text
         client.cookies.set("ui", "en")
         en = client.get("/").text
         assert "Recently collected" in en and "Unread only" in en and "Full ranking" in en

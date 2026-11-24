@@ -236,10 +236,10 @@
     const tabs = $$('[data-saved-tab]');
     tabs.forEach(b => { $('[data-n]', b).textContent = ids(b.dataset.savedTab).length; });
     async function show(kind) {
-      tabs.forEach(b => b.classList.toggle('on', b.dataset.savedTab === kind));
+      tabs.forEach(b => { const on = b.dataset.savedTab === kind; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
       $('[data-list-label]').textContent = $(`[data-saved-tab="${kind}"]`).firstChild.textContent.trim();
       const list = ids(kind);
-      rows.innerHTML = list.length ? await (await fetch('/fragment/rows?slugs=' + encodeURIComponent(list.join(',')))).text() : '';
+      rows.innerHTML = list.length ? await (await fetch('/fragment/rows?layout=cards&slugs=' + encodeURIComponent(list.join(',')))).text() : '';
       const n = $$('[data-slug]', rows).length;
       empty.hidden = n > 0;
       empty.textContent = kind === 'liked' ? empty.dataset.likedEmpty : empty.dataset.savedEmpty;
@@ -255,7 +255,7 @@
     if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key.toLowerCase();
     if (body.dataset.view !== 'read') {
-      if (k === '/' && body.dataset.view !== 'search') { e.preventDefault(); const homeSearch = $('#home-q'); if (homeSearch) homeSearch.focus(); else location.href = '/search'; }
+      if (k === '/') { e.preventDefault(); const field = body.dataset.view === 'search' ? $('#q') : $('#home-q'); if (field) field.focus(); else location.href = '/search'; }
       return;
     }
     const art = currentArt();

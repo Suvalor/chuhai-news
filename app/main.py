@@ -132,6 +132,9 @@ def render(request, name, status=200, **kw):
         if kw.get("sort") and request.url.path != "/":
             query += f"&sort={kw['sort']}"
         kw["canonical"] += query
+    # Shared public header gets the same category links on every index page.
+    if name == "index.html" and "cats" not in kw:
+        kw["cats"] = db.categories()
     return templates.TemplateResponse(request, name, {
         "ui": ui, "t": T[ui], "base": base, "path": request.url.path, "font": font, "fmt": fmt,
         "count": lambda n: count(n, ui), "today": now.strftime("%Y.%m.%d"), "year": now.year, **kw}, status_code=status)
@@ -455,11 +458,11 @@ def fragment_next(request: Request, slug: str, ctx: str = "author", exclude: str
 
 
 @app.get("/fragment/rows", response_class=HTMLResponse)
-def fragment_rows(request: Request, slugs: str = ""):
+def fragment_rows(request: Request, slugs: str = "", layout: str = "rows"):
     ui = ui_of(request)
     wanted = [s for s in slugs.split(",") if s][:200]
     rows = deco(db.list_articles(slugs=wanted, sort="new", limit=200), ui) if wanted else []
-    return render(request, "_rows.html", items=rows, sort="new")
+    return render(request, "_cards.html" if layout == "cards" else "_rows.html", items=rows, sort="new")
 
 
 @app.post("/api/a/{slug}/{action}")

@@ -7,8 +7,10 @@
 <button type="button" data-save="{{ it.slug }}" aria-label="{{ t.save }}" aria-pressed="false"><span class="glyph" data-off="◇" data-on="◆" aria-hidden="true">◇</span></button>
 </div>
 </div>
-<h4 class="card-title f-{{ it.f }}"><a href="/a/{{ it.slug }}" class="stretch">{{ it.title }}</a></h4>
+<h{{ 4 if view == 'home' else 3 }} class="card-title f-{{ it.f }}"><a href="/a/{{ it.slug }}" class="stretch">{{ it.title }}</a></h{{ 4 if view == 'home' else 3 }}>
 {% if it.title_t %}<p class="card-translation" lang="{{ 'zh' if it.lang == 'en' else 'en' }}">{{ it.title_t }}</p>{% endif %}
 {% if it.summary %}<p class="card-summary"><span>{{ t.introLabel }}：</span>{{ it.summary }}</p>{% endif %}
+{% if it.note %}<p class="card-note"><span class="red">↳</span> {{ it.note }}</p>{% endif %}
+{% if view != 'home' %}<p class="card-metrics mono"><span>{{ t.read }} {{ it.views_f }}</span><span>{{ t.heatLabel }} {{ it.heat }}</span><span>{{ t.save }} {{ it.saves_f }}</span></p>{% endif %}
 </article>
 {% endfor %}
