@@ -31,7 +31,7 @@
 {% for it in hot5 %}
 <a class="hot5-row" href="/a/{{ it.slug }}">
 <span class="rank{{ ' hot' if loop.index <= 3 }}">{{ loop.index }}</span>
-<span class="hot5-title f-{{ it.ft if it.title_t and ui == 'zh' else it.f }}">{{ it.title_t if it.title_t and ui == 'zh' else it.title }}</span>
+{% set use_t = ui == 'zh' and it.lang == 'en' and it.title_t %}<span class="hot5-title f-{{ it.ft if use_t else it.f }}">{{ it.title_t if use_t else it.title }}</span>
 <span class="hot5-meta"><span>{{ it.author_name }}</span><span>{{ t.read }} {{ it.views_f }}</span><span>{{ t.heatLabel }} {{ it.heat }}</span></span>
 </a>
 {% else %}<p class="home-empty">{{ t.hotEmpty }}</p>{% endfor %}
