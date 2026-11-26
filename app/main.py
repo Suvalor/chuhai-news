@@ -268,7 +268,7 @@ def category(request: Request, key: str):
 def author_page(request: Request, handle: str):
     ui, base = ui_of(request), site_url(request)
     au = db.author(handle)
-    if not au:
+    if not au or not au["n"]:  # 无已发布文章的作者页是空壳，Google 判软 404
         return not_found(request)
     t = T[ui]
     bio = (au["bio_zh"] or au["bio_en"]) if ui == "zh" else (au["bio_en"] or au["bio_zh"])

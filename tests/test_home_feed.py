@@ -88,3 +88,17 @@ def test_hot5_keeps_chinese_original_title(tmp_path, monkeypatch):
         hot = client.get("/").text.split('class="wrap home-section hot5"', 1)[1].split("</section>", 1)[0]
         assert "中文原题" in hot and "English Title" not in hot
         assert "英文译题" in hot and "Original EN" not in hot
+
+
+def test_author_without_published_articles_is_404(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "empty-author.db")
+    db.init()
+    with closing(TestClient(app)) as client:
+        db.upsert_article({
+            "external_id": "draft:1", "title": "Draft", "slug": "draft-1", "lang": "en",
+            "author": {"handle": "ghost", "name": "Ghost"}, "cat": "ai", "summary": "s",
+            "paras": [["body", "正文"]], "published_at": datetime.now(timezone.utc).isoformat(), "status": "draft",
+        })
+        assert db.author("ghost")["n"] == 0
+        r = client.get("/u/ghost")
+        assert r.status_code == 404 and 'content="noindex"' in r.text
