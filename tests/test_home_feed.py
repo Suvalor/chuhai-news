@@ -72,3 +72,19 @@ def test_home_collection_feed(tmp_path, monkeypatch):
         assert "Recently collected" in en and "Unread only" in en and "Full ranking" in en
         assert 'class="s-authors home-au"' not in en
         assert 'href="/u/writer"' in en and "Writer" in en
+
+
+def test_hot5_keeps_chinese_original_title(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "hot5.db")
+    db.init()
+    with closing(TestClient(app)) as client:
+        now = datetime.now(timezone.utc).isoformat()
+        for n, lang, title, title_t in ((1, "zh", "中文原题", "English Title"), (2, "en", "Original EN", "英文译题")):
+            db.upsert_article({
+                "external_id": f"hot5:{n}", "title": title, "title_t": title_t, "slug": f"hot5-{n}",
+                "lang": lang, "author": {"handle": "w", "name": "W"}, "cat": "ai", "summary": "导读",
+                "paras": [["正文", "body"]], "published_at": now, "views": 100, "status": "published",
+            })
+        hot = client.get("/").text.split('class="wrap home-section hot5"', 1)[1].split("</section>", 1)[0]
+        assert "中文原题" in hot and "English Title" not in hot
+        assert "英文译题" in hot and "Original EN" not in hot
