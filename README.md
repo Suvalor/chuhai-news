@@ -8,6 +8,8 @@ status: active
 
 # chuhainews
 
+官网：[出海新闻 chuhainews.com](https://www.chuhainews.com/) · RSS：[feed.xml](https://www.chuhainews.com/feed.xml)
+
 X 长文精选站：WebHook 推入文章 → SQLite → 服务端渲染的编辑风前台 + 管理后台 + MCP。设计来自 Claude Design「Chuhai News工具站设计 / ChuhaiEditorial.dc.html」。
 
 ## 运行
